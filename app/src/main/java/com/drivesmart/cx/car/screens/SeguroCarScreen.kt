@@ -56,7 +56,9 @@ class SeguroCarScreen(
             )
         } else {
             val s = seguro!!
-            val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+            val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).apply {
+                timeZone = TimeZone.getTimeZone("UTC")
+            }
             
             paneBuilder.addRow(
                 Row.Builder()

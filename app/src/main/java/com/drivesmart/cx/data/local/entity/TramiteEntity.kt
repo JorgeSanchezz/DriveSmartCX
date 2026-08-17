@@ -23,5 +23,6 @@ data class TramiteEntity(
     val nombre: String,
     val fechaVencimiento: Long,
     val estatus: String,
-    val descripcion: String?
+    val descripcion: String?,
+    val photoUri: String? = null
 )

@@ -19,7 +19,9 @@ object PdfHelper {
         val page = document.startPage(pageInfo)
         val canvas: Canvas = page.canvas
         val paint = Paint()
-        val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+        val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+        }
 
         var y = 40f
 

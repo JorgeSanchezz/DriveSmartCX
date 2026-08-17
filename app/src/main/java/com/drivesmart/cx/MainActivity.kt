@@ -2,6 +2,7 @@ package com.drivesmart.cx
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -68,14 +69,21 @@ class MainActivity : FragmentActivity() {
                     ) { _ -> }
 
                     LaunchedEffect(Unit) {
-                        if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                            locationPermissionLauncher.launch(
-                                arrayOf(
-                                    Manifest.permission.ACCESS_FINE_LOCATION,
-                                    Manifest.permission.ACCESS_COARSE_LOCATION
-                                )
-                            )
+                        val permissionsToRequest = mutableListOf(
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                        )
+                        
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
                         }
+
+                        // Opcional: Pedir permiso de SMS para el botón de pánico
+                        if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
+                            permissionsToRequest.add(Manifest.permission.SEND_SMS)
+                        }
+
+                        locationPermissionLauncher.launch(permissionsToRequest.toTypedArray())
                     }
 
                     if (isAuthenticated || !isBiometricEnabled || vehicles!!.isEmpty() || isSessionAuth) {

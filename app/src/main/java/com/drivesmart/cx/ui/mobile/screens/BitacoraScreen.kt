@@ -32,6 +32,22 @@ fun BitacoraScreen(viewModel: DriveSmartViewModel) {
     val bitacora by viewModel.currentBitacora.collectAsState()
     val activeViaje by viewModel.activeViaje.collectAsState()
     val context = LocalContext.current
+    
+    val sdfFull = remember { 
+        SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).apply { 
+            timeZone = TimeZone.getTimeZone("UTC") 
+        } 
+    }
+    val sdfTime = remember { 
+        SimpleDateFormat("HH:mm", Locale.getDefault()).apply { 
+            timeZone = TimeZone.getTimeZone("UTC") 
+        } 
+    }
+    val sdfDate = remember { 
+        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).apply { 
+            timeZone = TimeZone.getTimeZone("UTC") 
+        } 
+    }
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Bitácora de Viajes") }) }
@@ -56,7 +72,7 @@ fun BitacoraScreen(viewModel: DriveSmartViewModel) {
                         )
                         if (activeViaje != null) {
                             Text(
-                                text = "Iniciado: ${SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(activeViaje!!.fechaInicio))}",
+                                text = "Iniciado: ${sdfTime.format(Date(activeViaje!!.fechaInicio))}",
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
@@ -89,7 +105,7 @@ fun BitacoraScreen(viewModel: DriveSmartViewModel) {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 val filteredBitacora = bitacora.filter { it.fechaFin != null }
                 items(filteredBitacora) { viaje ->
-                    ViajeItem(viaje, onDelete = { viewModel.removeViaje(viaje) }, onShowMap = {
+                    ViajeItem(viaje, sdfDate, sdfTime, onDelete = { viewModel.removeViaje(viaje) }, onShowMap = {
                         val uri = "http://maps.google.com/maps?saddr=${viaje.latInicio},${viaje.lngInicio}&daddr=${viaje.latFin},${viaje.lngFin}"
                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(uri))
                         context.startActivity(intent)
@@ -101,16 +117,16 @@ fun BitacoraScreen(viewModel: DriveSmartViewModel) {
 }
 
 @Composable
-fun ViajeItem(viaje: BitacoraEntity, onDelete: () -> Unit, onShowMap: () -> Unit) {
+fun ViajeItem(viaje: BitacoraEntity, sdfDate: SimpleDateFormat, sdfTime: SimpleDateFormat, onDelete: () -> Unit, onShowMap: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f).padding(8.dp)) {
                 Text(
-                    text = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(viaje.fechaInicio)),
+                    text = sdfDate.format(Date(viaje.fechaInicio)),
                     style = MaterialTheme.typography.titleSmall
                 )
                 Text(
-                    text = "${SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(viaje.fechaInicio))} - ${SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(viaje.fechaFin ?: 0))}",
+                    text = "${sdfTime.format(Date(viaje.fechaInicio))} - ${sdfTime.format(Date(viaje.fechaFin ?: 0))}",
                     style = MaterialTheme.typography.bodyMedium
                 )
                 if (viaje.duracion != null) {

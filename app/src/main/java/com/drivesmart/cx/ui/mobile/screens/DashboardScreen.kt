@@ -40,15 +40,19 @@ fun DashboardScreen(
 
     val servicios by viewModel.currentServicios.collectAsState()
     val tramites by viewModel.currentTramites.collectAsState()
+    
+    val tramiteAlertDays by viewModel.tramiteAlertDays.collectAsState()
+    val servicioAlertKm by viewModel.servicioAlertKm.collectAsState()
+    val servicioAlertDays by viewModel.servicioAlertDays.collectAsState()
 
-    val alerts = remember(servicios, tramites, currentVehicle) {
+    val alerts = remember(servicios, tramites, currentVehicle, tramiteAlertDays, servicioAlertKm, servicioAlertDays) {
         val criticalItems = (servicios.filter { it.estatus == "Crítico" }.map { "Servicio: ${it.nombre} (CRÍTICO)" } +
                             tramites.filter { it.estatus == "Crítico" }.map { "Trámite: ${it.nombre} (CRÍTICO)" })
         
         val upcomingItems = mutableListOf<String>()
         val currentTime = System.currentTimeMillis()
-        val oneMonthMs = 30L * 24 * 60 * 60 * 1000
-        val threeMonthsMs = 90L * 24 * 60 * 60 * 1000
+        val oneMonthMs = tramiteAlertDays.toLong() * 24 * 60 * 60 * 1000
+        val serviceDaysMs = servicioAlertDays.toLong() * 24 * 60 * 60 * 1000
 
         tramites.filter { it.estatus == "Pendiente" && it.fechaVencimiento - currentTime < oneMonthMs }
             .forEach { upcomingItems.add("Vence pronto: ${it.nombre}") }
@@ -58,9 +62,12 @@ fun DashboardScreen(
                 val kmLeft = if (s.proximoKilometraje != null) s.proximoKilometraje!! - v.kilometrajeActual else Double.MAX_VALUE
                 val timeLeft = if (s.proximaFecha != null) s.proximaFecha!! - currentTime else Long.MAX_VALUE
                 
-                if (kmLeft <= 1000 || (timeLeft > 0 && timeLeft <= threeMonthsMs)) {
-                    val detail = if (kmLeft <= 1000) "${NumberFormatter.formatKm(s.proximoKilometraje!!)} KM" 
-                                 else SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(s.proximaFecha!!))
+                if (kmLeft <= servicioAlertKm || (timeLeft > 0 && timeLeft <= serviceDaysMs)) {
+                    val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).apply { 
+                        timeZone = TimeZone.getTimeZone("UTC") 
+                    }
+                    val detail = if (kmLeft <= servicioAlertKm) "${NumberFormatter.formatKm(s.proximoKilometraje!!)} KM" 
+                                 else sdf.format(Date(s.proximaFecha!!))
                     upcomingItems.add("Próximo servicio: ${s.nombre} ($detail)")
                 }
             }

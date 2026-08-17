@@ -10,8 +10,10 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -29,6 +31,20 @@ fun EmergenciasSOSScreen(viewModel: DriveSmartViewModel) {
     val sosMessage by viewModel.sosMessage.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
+
+    var countdownSeconds by remember { mutableIntStateOf(0) }
+    var isCountdownActive by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isCountdownActive, countdownSeconds) {
+        if (isCountdownActive && countdownSeconds > 0) {
+            delay(1000)
+            countdownSeconds -= 1
+            if (countdownSeconds == 0) {
+                isCountdownActive = false
+                NotificationHelper.sendSOS(context, sosContacts, sosMessage)
+            }
+        }
+    }
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Configurar Botón SOS") }) }
@@ -56,10 +72,13 @@ fun EmergenciasSOSScreen(viewModel: DriveSmartViewModel) {
                         )
                         Spacer(Modifier.height(16.dp))
                         Button(
-                            onClick = { NotificationHelper.sendSOS(context, sosContacts, sosMessage) },
+                            onClick = { 
+                                countdownSeconds = 5
+                                isCountdownActive = true 
+                            },
                             colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
                             modifier = Modifier.fillMaxWidth().height(60.dp),
-                            enabled = sosContacts.isNotEmpty()
+                            enabled = sosContacts.isNotEmpty() && !isCountdownActive
                         ) {
                             Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
@@ -115,6 +134,32 @@ fun EmergenciasSOSScreen(viewModel: DriveSmartViewModel) {
                     viewModel.saveSOSContact(nombre, tel)
                     showAddDialog = false
                 }
+            )
+        }
+
+        if (isCountdownActive) {
+            AlertDialog(
+                onDismissRequest = { /* No cerrar al tocar fuera */ },
+                confirmButton = {
+                    TextButton(
+                        onClick = { isCountdownActive = false },
+                        colors = ButtonDefaults.textButtonColors(contentColor = Color.Red)
+                    ) {
+                        Text("CANCELAR ENVÍO")
+                    }
+                },
+                title = { Text("Enviando SOS...") },
+                text = {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = countdownSeconds.toString(),
+                            style = MaterialTheme.typography.displayLarge,
+                            color = Color.Red
+                        )
+                        Text("El mensaje se enviará automáticamente en $countdownSeconds segundos.")
+                    }
+                },
+                icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = Color.Red) }
             )
         }
     }

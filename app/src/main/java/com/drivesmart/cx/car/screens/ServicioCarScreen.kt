@@ -45,9 +45,12 @@ class ServicioCarScreen(
             paneBuilder.addRow(Row.Builder().setTitle("No hay servicios registrados").build())
         } else {
             servicios.forEach { servicio ->
+                val sdf = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault()).apply {
+                    timeZone = java.util.TimeZone.getTimeZone("UTC")
+                }
                 val lastInfo = "Último: ${NumberFormatter.formatKm(servicio.ultimoKilometraje)} KM"
                 val nextKm = servicio.proximoKilometraje?.let { NumberFormatter.formatKm(it) } ?: "---"
-                val nextDate = servicio.proximaFecha?.let { java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault()).format(java.util.Date(it)) } ?: "---"
+                val nextDate = servicio.proximaFecha?.let { sdf.format(java.util.Date(it)) } ?: "---"
                 val nextInfo = "Próximo: $nextDate / $nextKm KM"
                 
                 val statusColor = when (servicio.estatus) {

@@ -41,6 +41,30 @@ class DriveSmartViewModel @Inject constructor(
     private val _sosMessage = MutableStateFlow(sharedPreferences.getString("sos_message", "¡Emergencia! Esta es mi ubicación actual:") ?: "¡Emergencia! Esta es mi ubicación actual:")
     val sosMessage: StateFlow<String> = _sosMessage.asStateFlow()
 
+    private val _tramiteAlertDays = MutableStateFlow(sharedPreferences.getInt("tramite_alert_days", 30))
+    val tramiteAlertDays: StateFlow<Int> = _tramiteAlertDays.asStateFlow()
+
+    private val _servicioAlertKm = MutableStateFlow(sharedPreferences.getInt("servicio_alert_km", 1000))
+    val servicioAlertKm: StateFlow<Int> = _servicioAlertKm.asStateFlow()
+
+    private val _servicioAlertDays = MutableStateFlow(sharedPreferences.getInt("servicio_alert_days", 90))
+    val servicioAlertDays: StateFlow<Int> = _servicioAlertDays.asStateFlow()
+
+    fun setTramiteAlertDays(days: Int) {
+        sharedPreferences.edit().putInt("tramite_alert_days", days).apply()
+        _tramiteAlertDays.value = days
+    }
+
+    fun setServicioAlertKm(km: Int) {
+        sharedPreferences.edit().putInt("servicio_alert_km", km).apply()
+        _servicioAlertKm.value = km
+    }
+
+    fun setServicioAlertDays(days: Int) {
+        sharedPreferences.edit().putInt("servicio_alert_days", days).apply()
+        _servicioAlertDays.value = days
+    }
+
     fun setSosMessage(message: String) {
         sharedPreferences.edit().putString("sos_message", message).apply()
         _sosMessage.value = message
@@ -277,7 +301,8 @@ class DriveSmartViewModel @Inject constructor(
         nombre: String,
         fechaVencimiento: Long,
         estatus: String,
-        descripcion: String?
+        descripcion: String?,
+        photoUri: String? = null
     ) {
         val vehiculoId = selectedVehicleId.value ?: return
         viewModelScope.launch {
@@ -288,7 +313,8 @@ class DriveSmartViewModel @Inject constructor(
                     nombre = nombre,
                     fechaVencimiento = fechaVencimiento,
                     estatus = estatus,
-                    descripcion = descripcion
+                    descripcion = descripcion,
+                    photoUri = photoUri
                 )
             )
         }

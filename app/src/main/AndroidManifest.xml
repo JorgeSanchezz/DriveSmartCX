@@ -2,17 +2,19 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Permisos para Android Auto y Seguridad -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
-
-    <!-- Permisos para ubicación (Bitácora de Viaje) -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-
-    <!-- Permiso para realizar llamadas (EmergenciasScreen) -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SEND_SMS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="androidx.car.app.ACCESS_SURFACE" />
+
+    <uses-feature android:name="android.hardware.type.automotive" android:required="false" />
 
     <application
         android:name=".DriveSmartApp"
@@ -22,9 +24,10 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.DriveSmartCX"
-        tools:targetApi="31">
+        tools:targetApi="35">
 
-        <!-- Actividad Principal (Mobile UI) -->
+        <meta-data android:name="distractionOptimized" android:value="true"/>
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -36,21 +39,29 @@
             </intent-filter>
         </activity>
 
-        <!-- Servicio para Android Auto -->
         <service
             android:name=".car.service.DriveSmartCarAppService"
             android:exported="true"
-            android:label="@string/app_name">
+            android:icon="@mipmap/ic_launcher"
+            android:label="@string/app_name"
+            android:foregroundServiceType="location"
+            android:directBootAware="true">
             <intent-filter>
                 <action android:name="androidx.car.app.CarAppService" />
                 <category android:name="androidx.car.app.category.POI" />
             </intent-filter>
+            <meta-data
+                android:name="androidx.car.app.category"
+                android:value="poi" />
+            <meta-data
+                android:name="distractionOptimized"
+                android:value="true"/>
         </service>
 
-        <!-- Metadatos requeridos por Android Auto -->
         <meta-data
             android:name="com.google.android.gms.car.application"
             android:resource="@xml/automotive_app_desc" />
+
         <meta-data
             android:name="androidx.car.app.minCarApiLevel"
             android:value="1" />

@@ -26,6 +26,17 @@ import java.util.*
 fun EstacionamientoScreen(viewModel: DriveSmartViewModel) {
     val ubicaciones by viewModel.currentUbicaciones.collectAsState()
     val context = LocalContext.current
+    
+    val sdf = remember { 
+        SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).apply { 
+            timeZone = TimeZone.getTimeZone("UTC") 
+        } 
+    }
+    val sdfFull = remember { 
+        SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).apply { 
+            timeZone = TimeZone.getTimeZone("UTC") 
+        } 
+    }
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Ubicaciones de Estacionamiento") }) },
@@ -37,7 +48,7 @@ fun EstacionamientoScreen(viewModel: DriveSmartViewModel) {
                     return@FloatingActionButton
                 }
                 
-                val fecha = SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(Date())
+                val fecha = sdf.format(Date())
                 viewModel.saveUbicacion(
                     nombre = "Estacionamiento $fecha",
                     lat = loc.latitude,
@@ -63,6 +74,7 @@ fun EstacionamientoScreen(viewModel: DriveSmartViewModel) {
                 items(ubicaciones) { ubicacion ->
                     UbicacionItem(
                         ubicacion = ubicacion,
+                        sdfFull = sdfFull,
                         onDelete = { viewModel.removeUbicacion(ubicacion) },
                         onShowMap = {
                             val uri = "geo:${ubicacion.latitud},${ubicacion.longitud}?q=${ubicacion.latitud},${ubicacion.longitud}(${ubicacion.nombre})"
@@ -77,13 +89,13 @@ fun EstacionamientoScreen(viewModel: DriveSmartViewModel) {
 }
 
 @Composable
-fun UbicacionItem(ubicacion: UbicacionEntity, onDelete: () -> Unit, onShowMap: () -> Unit) {
+fun UbicacionItem(ubicacion: UbicacionEntity, sdfFull: SimpleDateFormat, onDelete: () -> Unit, onShowMap: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f).padding(8.dp)) {
                 Text(ubicacion.nombre, style = MaterialTheme.typography.titleMedium)
                 Text(
-                    text = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date(ubicacion.fechaGuardado)),
+                    text = sdfFull.format(Date(ubicacion.fechaGuardado)),
                     style = MaterialTheme.typography.bodySmall
                 )
             }

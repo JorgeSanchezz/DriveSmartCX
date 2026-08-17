@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.drivesmart.cx.data.local.entity.SeguroEntity
+import com.drivesmart.cx.ui.mobile.components.FullScreenImageDialog
 import com.drivesmart.cx.ui.viewmodel.DriveSmartViewModel
 import java.text.SimpleDateFormat
 import java.util.*
@@ -86,12 +87,26 @@ fun SeguroScreen(viewModel: DriveSmartViewModel) {
 @Composable
 fun SeguroDetail(seguro: SeguroEntity, modifier: Modifier = Modifier, onUpdate: (SeguroEntity) -> Unit) {
     val context = LocalContext.current
-    val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+    val sdf = remember { 
+        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).apply { 
+            timeZone = TimeZone.getTimeZone("UTC") 
+        } 
+    }
 
     val documentPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
-        uri?.let { onUpdate(seguro.copy(documentUri = it.toString())) }
+        uri?.let {
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    it,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            onUpdate(seguro.copy(documentUri = it.toString()))
+        }
     }
 
     LazyColumn(
@@ -152,7 +167,10 @@ fun SeguroDetail(seguro: SeguroEntity, modifier: Modifier = Modifier, onUpdate: 
             Text("Póliza Digital", style = MaterialTheme.typography.titleSmall)
             if (seguro.documentUri != null) {
                 Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(
+                        modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
                         if (seguro.documentUri.contains("image")) {
                             AsyncImage(
                                 model = seguro.documentUri,
@@ -169,6 +187,7 @@ fun SeguroDetail(seguro: SeguroEntity, modifier: Modifier = Modifier, onUpdate: 
                         } else {
                             Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(64.dp))
                             Text("Documento Guardado", style = MaterialTheme.typography.bodyMedium)
+                            Spacer(Modifier.height(8.dp))
                             Button(onClick = {
                                 val intent = Intent(Intent.ACTION_VIEW).apply {
                                     setDataAndType(Uri.parse(seguro.documentUri), "application/pdf")
@@ -184,7 +203,11 @@ fun SeguroDetail(seguro: SeguroEntity, modifier: Modifier = Modifier, onUpdate: 
                             }
                         }
                         
-                        TextButton(onClick = { onUpdate(seguro.copy(documentUri = null)) }, colors = ButtonDefaults.textButtonColors(contentColor = Color.Red)) {
+                        Spacer(Modifier.height(8.dp))
+                        TextButton(
+                            onClick = { onUpdate(seguro.copy(documentUri = null)) }, 
+                            colors = ButtonDefaults.textButtonColors(contentColor = Color.Red)
+                        ) {
                             Icon(Icons.Default.Delete, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
                             Text("Eliminar Documento")
@@ -226,9 +249,31 @@ fun SeguroForm(
     var cobertura by remember { mutableStateOf(seguro?.tipoCobertura ?: "Amplia") }
     var notas by remember { mutableStateOf(seguro?.notas ?: "") }
     var documentUri by remember { mutableStateOf(seguro?.documentUri) }
+    var showFullScreenImage by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    val documentPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri?.let {
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    it,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            documentUri = it.toString()
+        }
+    }
     
-    var vencimiento by remember { mutableStateOf(seguro?.fechaVencimiento ?: System.currentTimeMillis()) }
-    val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+    var vencimiento by remember { mutableLongStateOf(seguro?.fechaVencimiento ?: System.currentTimeMillis()) }
+    val sdf = remember { 
+        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).apply { 
+            timeZone = TimeZone.getTimeZone("UTC") 
+        } 
+    }
 
     var showDatePicker by remember { mutableStateOf(false) }
 
@@ -272,6 +317,62 @@ fun SeguroForm(
         item { OutlinedTextField(value = notas, onValueChange = { notas = it }, label = { Text("Notas") }, modifier = Modifier.fillMaxWidth(), minLines = 3) }
 
         item {
+            if (documentUri != null) {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        if (documentUri!!.contains("image")) {
+                            AsyncImage(
+                                model = documentUri,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(150.dp)
+                                    .clickable { showFullScreenImage = true },
+                                contentScale = ContentScale.Fit
+                            )
+                        } else {
+                            Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(48.dp))
+                            Text("Documento Guardado", style = MaterialTheme.typography.bodyMedium)
+                            Spacer(Modifier.height(8.dp))
+                            Button(
+                                onClick = {
+                                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                                        setDataAndType(Uri.parse(documentUri), "application/pdf")
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                    try { context.startActivity(intent) } catch (e: Exception) { }
+                                }
+                            ) {
+                                Text("Ver PDF")
+                            }
+                        }
+                        
+                        TextButton(
+                            onClick = { documentUri = null },
+                            colors = ButtonDefaults.textButtonColors(contentColor = Color.Red)
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Eliminar Documento")
+                        }
+                    }
+                }
+            } else {
+                OutlinedButton(
+                    onClick = { documentPickerLauncher.launch(arrayOf("image/*", "application/pdf")) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Cargar Póliza (PDF o Imagen)")
+                }
+            }
+        }
+
+        item {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (seguro != null) {
                     OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("Cancelar") }
@@ -300,5 +401,9 @@ fun SeguroForm(
                 }
             }
         }
+    }
+
+    if (showFullScreenImage && documentUri != null) {
+        FullScreenImageDialog(photoUri = documentUri!!, onDismiss = { showFullScreenImage = false })
     }
 }

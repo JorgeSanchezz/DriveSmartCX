@@ -1,7 +1,10 @@
 package com.drivesmart.cx.ui.mobile.screens
 
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -18,10 +21,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.drivesmart.cx.data.local.entity.ServicioEntity
+import com.drivesmart.cx.ui.mobile.components.FullScreenImageDialog
 import com.drivesmart.cx.ui.viewmodel.DriveSmartViewModel
 import com.drivesmart.cx.util.NumberFormatter
 import java.text.SimpleDateFormat
@@ -33,6 +38,12 @@ fun ServiciosScreen(viewModel: DriveSmartViewModel) {
     val servicios by viewModel.currentServicios.collectAsState()
     var showDialog by remember { mutableStateOf(false) }
     var selectedServicio by remember { mutableStateOf<ServicioEntity?>(null) }
+
+    val sdf = remember { 
+        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).apply { 
+            timeZone = TimeZone.getTimeZone("UTC") 
+        } 
+    }
 
     Scaffold(
         topBar = {
@@ -91,14 +102,14 @@ fun ServiciosScreen(viewModel: DriveSmartViewModel) {
                                 
                                 if (servicio.tipo == "Servicio") {
                                     Text(
-                                        "Último: ${SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(servicio.ultimaFecha))} - ${NumberFormatter.formatKm(servicio.ultimoKilometraje)} KM",
+                                        "Último: ${sdf.format(Date(servicio.ultimaFecha))} - ${NumberFormatter.formatKm(servicio.ultimoKilometraje)} KM",
                                         style = MaterialTheme.typography.bodySmall
                                     )
                                 }
                                 
                                 if (servicio.proximoKilometraje != null || servicio.proximaFecha != null) {
                                     val nextKm = servicio.proximoKilometraje?.let { "${NumberFormatter.formatKm(it)} KM" } ?: ""
-                                    val nextDate = servicio.proximaFecha?.let { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(it)) } ?: ""
+                                    val nextDate = servicio.proximaFecha?.let { sdf.format(Date(it)) } ?: ""
                                     val separator = if (nextKm.isNotEmpty() && nextDate.isNotEmpty()) " - " else ""
                                     val label = if (servicio.tipo == "Componente") "Instalación: " else "Próximo: "
                                     Text(
@@ -177,11 +188,23 @@ fun AddServicioDialog(
     var estatus by remember { mutableStateOf(servicio?.estatus ?: "Pendiente") }
     var monto by remember { mutableStateOf(servicio?.monto?.toString() ?: "") }
     var photoUri by remember { mutableStateOf(servicio?.photoUri) }
+    var showFullScreenImage by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: android.net.Uri? ->
-        photoUri = uri?.toString()
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri?.let {
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    it,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            photoUri = it.toString()
+        }
     }
 
     var showUltimaDatePicker by remember { mutableStateOf(false) }
@@ -213,7 +236,11 @@ fun AddServicioDialog(
         ) { DatePicker(state = datePickerState) }
     }
 
-    val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+    val sdf = remember { 
+        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).apply { 
+            timeZone = TimeZone.getTimeZone("UTC") 
+        } 
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -333,18 +360,34 @@ fun AddServicioDialog(
                             AsyncImage(
                                 model = photoUri,
                                 contentDescription = null,
-                                modifier = Modifier.fillMaxWidth().height(150.dp).clickable { photoPickerLauncher.launch("image/*") },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(150.dp)
+                                    .clickable { showFullScreenImage = true },
                                 contentScale = ContentScale.Crop
                             )
-                            IconButton(
-                                onClick = { photoUri = null },
-                                modifier = Modifier.align(Alignment.TopEnd)
+                            Row(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(4.dp)
                             ) {
-                                Icon(Icons.Default.Close, contentDescription = "Quitar foto", tint = Color.Red)
+                                IconButton(
+                                    onClick = { photoPickerLauncher.launch(arrayOf("image/*")) },
+                                    modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), shape = MaterialTheme.shapes.small)
+                                ) {
+                                    Icon(Icons.Default.Edit, contentDescription = "Cambiar foto", tint = Color.White)
+                                }
+                                Spacer(Modifier.width(4.dp))
+                                IconButton(
+                                    onClick = { photoUri = null },
+                                    modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), shape = MaterialTheme.shapes.small)
+                                ) {
+                                    Icon(Icons.Default.Close, contentDescription = "Quitar foto", tint = Color.Red)
+                                }
                             }
                         }
                     } else {
-                        OutlinedButton(onClick = { photoPickerLauncher.launch("image/*") }, modifier = Modifier.fillMaxWidth()) {
+                        OutlinedButton(onClick = { photoPickerLauncher.launch(arrayOf("image/*")) }, modifier = Modifier.fillMaxWidth()) {
                             Icon(Icons.Default.Add, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
                             Text("Añadir Foto")
@@ -375,4 +418,8 @@ fun AddServicioDialog(
             TextButton(onClick = onDismiss) { Text("Cancelar") }
         }
     )
+
+    if (showFullScreenImage && photoUri != null) {
+        FullScreenImageDialog(photoUri = photoUri!!, onDismiss = { showFullScreenImage = false })
+    }
 }

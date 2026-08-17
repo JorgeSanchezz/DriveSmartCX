@@ -19,7 +19,7 @@ import com.drivesmart.cx.data.local.entity.*
         PreventivoEntity::class,
         ContactoEmergenciaEntity::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

@@ -63,11 +63,12 @@ fun PreventivosScreen(viewModel: DriveSmartViewModel) {
             AddPreventivoDialog(
                 item = selectedItem,
                 onDismiss = { showDialog = false },
-                onConfirm = { nombre, dias ->
+                onConfirm = { nombre, dias, notas ->
                     viewModel.savePreventivo(
                         id = selectedItem?.id ?: 0,
                         nombre = nombre, 
-                        dias = dias
+                        dias = dias,
+                        notas = notas
                     )
                     showDialog = false
                 }
@@ -80,7 +81,11 @@ fun PreventivosScreen(viewModel: DriveSmartViewModel) {
 fun PreventivoCard(item: PreventivoEntity, onCheck: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
     val nextDate = item.ultimaRevision + (item.frecuenciaDias.toLong() * 24 * 60 * 60 * 1000)
     val isOverdue = System.currentTimeMillis() > nextDate
-    val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+    val sdf = remember { 
+        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).apply { 
+            timeZone = TimeZone.getTimeZone("UTC") 
+        } 
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -93,6 +98,10 @@ fun PreventivoCard(item: PreventivoEntity, onCheck: () -> Unit, onEdit: () -> Un
                 Text(item.nombre, style = MaterialTheme.typography.titleMedium)
                 Text("Ultima Revision: ${sdf.format(Date(item.ultimaRevision))}", style = MaterialTheme.typography.bodySmall)
                 Text("Proxima Revision: ${sdf.format(Date(nextDate))}", style = MaterialTheme.typography.bodySmall, color = if (isOverdue) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
+                if (!item.notas.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(item.notas, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                }
             }
             IconButton(onClick = onCheck) {
                 Icon(Icons.Default.CheckCircle, contentDescription = "Marcar como hecho", tint = MaterialTheme.colorScheme.primary)
@@ -108,9 +117,10 @@ fun PreventivoCard(item: PreventivoEntity, onCheck: () -> Unit, onEdit: () -> Un
 }
 
 @Composable
-fun AddPreventivoDialog(item: PreventivoEntity? = null, onDismiss: () -> Unit, onConfirm: (String, Int) -> Unit) {
+fun AddPreventivoDialog(item: PreventivoEntity? = null, onDismiss: () -> Unit, onConfirm: (String, Int, String?) -> Unit) {
     var nombre by remember { mutableStateOf(item?.nombre ?: "") }
     var dias by remember { mutableStateOf(item?.frecuenciaDias?.toString() ?: "30") }
+    var notas by remember { mutableStateOf(item?.notas ?: "") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -125,10 +135,17 @@ fun AddPreventivoDialog(item: PreventivoEntity? = null, onDismiss: () -> Unit, o
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
+                OutlinedTextField(
+                    value = notas,
+                    onValueChange = { notas = it },
+                    label = { Text("Notas / Observaciones") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2
+                )
             }
         },
         confirmButton = {
-            Button(onClick = { onConfirm(nombre, dias.toIntOrNull() ?: 30) }, enabled = nombre.isNotBlank()) {
+            Button(onClick = { onConfirm(nombre, dias.toIntOrNull() ?: 30, notas.ifBlank { null }) }, enabled = nombre.isNotBlank()) {
                 Text(if (item == null) "Añadir" else "Actualizar")
             }
         },
