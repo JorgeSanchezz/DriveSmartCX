@@ -1,8 +1,10 @@
 package com.drivesmart.cx.di
 
 import com.drivesmart.cx.data.repository.DriveSmartRepositoryImpl
+import com.drivesmart.cx.data.repository.MicodusRepositoryImpl
 import com.drivesmart.cx.data.repository.VehicleRepositoryImpl
 import com.drivesmart.cx.domain.repository.DriveSmartRepository
+import com.drivesmart.cx.domain.repository.MicodusRepository
 import com.drivesmart.cx.domain.repository.VehicleRepository
 import dagger.Binds
 import dagger.Module
@@ -21,4 +23,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindAssistantRepository(impl: DriveSmartRepositoryImpl): DriveSmartRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindMicodusRepository(impl: MicodusRepositoryImpl): MicodusRepository
 }

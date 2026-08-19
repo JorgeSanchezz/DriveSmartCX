@@ -3,12 +3,16 @@ package com.drivesmart.cx.ui.mobile.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.drivesmart.cx.ui.mobile.screens.*
 import com.drivesmart.cx.ui.viewmodel.DriveSmartViewModel
+import com.drivesmart.cx.ui.viewmodel.MicodusViewModel
 
 @Composable
 fun DriveSmartNavGraph(
@@ -44,6 +48,7 @@ fun DriveSmartNavGraph(
                 onNavigateToInfoVehiculo = { navController.navigate(Screen.InformacionVehiculo.route) },
                 onNavigateToGarage = { navController.navigate(Screen.Garage.route) },
                 onNavigateToConfig = { navController.navigate(Screen.Configuracion.route) },
+                onNavigateToMicodus = { navController.navigate(Screen.MicodusLogin.route) },
                 onEditVehicle = { id -> navController.navigate(Screen.VehiculoForm.createRoute(id)) }
             )
         }
@@ -104,6 +109,24 @@ fun DriveSmartNavGraph(
         }
         composable(Screen.Configuracion.route) {
             com.drivesmart.cx.ui.mobile.screens.ConfiguracionScreen(viewModel)
+        }
+
+        // --- ZONA MICODUS UNIFICADA ---
+        composable(Screen.MicodusLogin.route) {
+            // Usamos el NavBackStackEntry para que el ViewModel persista entre pantallas
+            val micodusViewModel: MicodusViewModel = hiltViewModel()
+            MicodusLoginScreen(
+                viewModel = micodusViewModel,
+                onLoginSuccess = { 
+                    navController.navigate(Screen.MicodusVehicle.route)
+                }
+            )
+        }
+        composable(Screen.MicodusVehicle.route) {
+            // Recuperamos el MISMO ViewModel que se usó en el Login
+            val backStackEntry = remember(it) { navController.getBackStackEntry(Screen.MicodusLogin.route) }
+            val micodusViewModel: MicodusViewModel = hiltViewModel(backStackEntry)
+            MicodusVehicleScreen(viewModel = micodusViewModel)
         }
     }
 }

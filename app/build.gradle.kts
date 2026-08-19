@@ -65,6 +65,12 @@ dependencies {
     // Image Loading
     implementation(libs.coil.compose)
 
+    // Networking
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.gson)
+    implementation(libs.okhttp)
+    implementation(libs.okhttp.logging)
+
     // Android for Cars App Library
     implementation(libs.car.app)
 

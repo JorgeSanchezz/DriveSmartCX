@@ -17,6 +17,8 @@ gson = "2.10.1"
 opencsv = "5.9"
 hiltNavigationCompose = "1.2.0"
 coil = "2.6.0"
+retrofit = "2.11.0"
+okhttp = "4.12.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -56,6 +58,10 @@ biometric = { group = "androidx.biometric", name = "biometric", version.ref = "b
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
 opencsv = { group = "com.opencsv", name = "opencsv", version.ref = "opencsv" }
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
+retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }
+retrofit-gson = { group = "com.squareup.retrofit2", name = "converter-gson", version.ref = "retrofit" }
+okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+okhttp-logging = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttp" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

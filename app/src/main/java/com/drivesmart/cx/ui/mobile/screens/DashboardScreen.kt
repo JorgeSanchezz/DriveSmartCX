@@ -30,6 +30,7 @@ fun DashboardScreen(
     onNavigateToInfoVehiculo: () -> Unit,
     onNavigateToGarage: () -> Unit,
     onNavigateToConfig: () -> Unit,
+    onNavigateToMicodus: () -> Unit,
     onEditVehicle: (Long) -> Unit
 ) {
     val vehicles by viewModel.allVehicles.collectAsState()
@@ -187,7 +188,13 @@ fun DashboardScreen(
                         icon = Icons.Default.Place,
                         onClick = onNavigateToEstacionamiento
                     )
-                    Spacer(modifier = Modifier.weight(2f))
+                    MenuActionCard(
+                        modifier = Modifier.weight(1f),
+                        title = "GPS Track",
+                        icon = Icons.Default.LocationOn,
+                        onClick = onNavigateToMicodus
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
                 }
             }
 
