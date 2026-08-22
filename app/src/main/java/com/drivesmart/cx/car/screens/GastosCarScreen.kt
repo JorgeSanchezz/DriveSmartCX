@@ -8,10 +8,13 @@ import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.lifecycleScope
 import com.drivesmart.cx.domain.repository.DriveSmartRepository
 import com.drivesmart.cx.domain.repository.VehicleRepository
+import com.drivesmart.cx.util.VehicleBrand
+import com.drivesmart.cx.R
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
+import androidx.compose.ui.graphics.toArgb
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class GastosCarScreen(
@@ -20,14 +23,21 @@ class GastosCarScreen(
     private val driveSmartRepository: DriveSmartRepository
 ) : Screen(carContext) {
 
-    private val brandColor = CarColor.createCustom(0xFF607D8B.toInt(), 0xFF607D8B.toInt())
-    private var categories: List<String> = listOf("Gasolina", "Casetas", "Comida", "Refacciones")
+    private var brandColor = CarColor.createCustom(0xFF607D8B.toInt(), 0xFF607D8B.toInt())
+    private var categories: List<String> = listOf("Gasolina", "Casetas", "Estacionamiento", "Comida", "Refacciones", "Otros")
 
     init {
         lifecycleScope.launch {
             vehicleRepository.getAllVehicles()
                 .flatMapLatest { vehicles ->
-                    val id = vehicles.find { it.isSelected }?.id ?: vehicles.firstOrNull()?.id
+                    val vehicle = vehicles.find { it.isSelected } ?: vehicles.firstOrNull()
+                    
+                    vehicle?.let {
+                        val colorInt = VehicleBrand.fromString(it.marca).color.toArgb()
+                        brandColor = CarColor.createCustom(colorInt, colorInt)
+                    }
+
+                    val id = vehicle?.id
                     if (id != null) {
                         driveSmartRepository.getGastos(id)
                     } else {
@@ -35,7 +45,7 @@ class GastosCarScreen(
                     }
                 }
                 .collect { gastos ->
-                    val defaults = listOf("Gasolina", "Casetas", "Comida", "Refacciones")
+                    val defaults = listOf("Gasolina", "Casetas", "Estacionamiento", "Comida", "Refacciones", "Otros")
                     val otherCategories = gastos.map { it.categoria }
                         .filter { it !in defaults }
                         .distinct()
@@ -47,18 +57,19 @@ class GastosCarScreen(
     }
 
     override fun onGetTemplate(): Template {
-        val listBuilder = ItemList.Builder()
+        val gridBuilder = ItemList.Builder()
         categories.forEach { cat ->
             val iconRes = when (cat) {
-                "Gasolina" -> android.R.drawable.ic_menu_add
-                "Casetas" -> android.R.drawable.ic_dialog_map
-                "Comida" -> android.R.drawable.ic_menu_view
-                "Refacciones" -> android.R.drawable.ic_menu_manage
-                else -> android.R.drawable.ic_menu_agenda
+                "Gasolina" -> R.drawable.ic_car_gas
+                "Casetas" -> R.drawable.ic_car_toll
+                "Estacionamiento" -> R.drawable.ic_car_parking
+                "Comida" -> R.drawable.ic_car_food
+                "Refacciones" -> R.drawable.ic_car_service
+                else -> R.drawable.ic_car_add
             }
 
-            listBuilder.addItem(
-                Row.Builder()
+            gridBuilder.addItem(
+                GridItem.Builder()
                     .setTitle(cat)
                     .setImage(CarIcon.Builder(IconCompat.createWithResource(carContext, iconRes))
                         .setTint(brandColor)
@@ -70,11 +81,10 @@ class GastosCarScreen(
             )
         }
 
-        return ListTemplate.Builder()
-            .setSingleList(listBuilder.build())
+        return GridTemplate.Builder()
+            .setSingleList(gridBuilder.build())
             .setTitle("Seleccionar Categoría")
             .setHeaderAction(Action.BACK)
             .build()
     }
 }
-

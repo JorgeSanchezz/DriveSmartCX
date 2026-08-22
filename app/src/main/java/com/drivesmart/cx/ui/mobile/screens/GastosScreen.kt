@@ -38,9 +38,7 @@ fun GastosScreen(viewModel: DriveSmartViewModel) {
     var selectedGasto by remember { mutableStateOf<GastoEntity?>(null) }
     
     val sdf = remember { 
-        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).apply { 
-            timeZone = TimeZone.getTimeZone("UTC") 
-        } 
+        SimpleDateFormat("dd/MM/yyyy hh:mm a", Locale.getDefault())
     }
     
     var selectedMonth by remember { mutableIntStateOf(Calendar.getInstance().get(Calendar.MONTH)) }
@@ -119,9 +117,7 @@ fun GastosScreen(viewModel: DriveSmartViewModel) {
                             color = MaterialTheme.colorScheme.primary
                         )
                         val monthName = remember(selectedMonth, selectedYear) {
-                            SimpleDateFormat("MMMM yyyy", Locale.getDefault()).apply {
-                                timeZone = TimeZone.getTimeZone("UTC")
-                            }.format(
+                            SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(
                                 Calendar.getInstance().apply { 
                                     set(Calendar.YEAR, selectedYear)
                                     set(Calendar.MONTH, selectedMonth) 
@@ -168,14 +164,15 @@ fun GastosScreen(viewModel: DriveSmartViewModel) {
                 gasto = selectedGasto,
                 availableCategories = categories,
                 onDismiss = { showAddDialog = false },
-                onConfirm = { cat, monto, litros, nota, photoUri ->
+                onConfirm = { cat, monto, litros, fecha, nota, photoUri ->
                     if (selectedGasto == null) {
-                        viewModel.addGasto(cat, monto, litros, nota, photoUri)
+                        viewModel.addGasto(cat, monto, litros, nota, photoUri, fecha)
                     } else {
                         viewModel.updateGasto(selectedGasto!!.copy(
                             categoria = cat,
                             monto = monto,
                             litros = litros,
+                            fecha = fecha,
                             nota = nota,
                             photoUri = photoUri
                         ))
@@ -225,19 +222,20 @@ fun GastoItem(gasto: GastoEntity, sdf: SimpleDateFormat, onEdit: () -> Unit, onD
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun AddGastoDialog(
     gasto: GastoEntity? = null,
     availableCategories: List<String>,
     onDismiss: () -> Unit,
-    onConfirm: (String, Double, Double?, String, String?) -> Unit
+    onConfirm: (String, Double, Double?, Long, String, String?) -> Unit
 ) {
     var categoria by remember { mutableStateOf(gasto?.categoria ?: "Gasolina") }
     var monto by remember { mutableStateOf(gasto?.monto?.toString() ?: "") }
     var litros by remember { mutableStateOf(gasto?.litros?.toString() ?: "") }
     var nota by remember { mutableStateOf(gasto?.nota ?: "") }
     var photoUri by remember { mutableStateOf(gasto?.photoUri) }
+    var fecha by remember { mutableLongStateOf(gasto?.fecha ?: System.currentTimeMillis()) }
     var showFullScreenImage by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
@@ -255,6 +253,61 @@ fun AddGastoDialog(
             }
             photoUri = it.toString()
         }
+    }
+
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
+    val sdf = remember { SimpleDateFormat("dd/MM/yyyy hh:mm a", Locale.getDefault()) }
+
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = fecha)
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { 
+                        val calOld = Calendar.getInstance().apply { timeInMillis = fecha }
+                        val calNew = Calendar.getInstance().apply { 
+                            timeInMillis = it 
+                            set(Calendar.HOUR_OF_DAY, calOld.get(Calendar.HOUR_OF_DAY))
+                            set(Calendar.MINUTE, calOld.get(Calendar.MINUTE))
+                        }
+                        fecha = calNew.timeInMillis 
+                    }
+                    showDatePicker = false
+                }) { Text("OK") }
+            }
+        ) { DatePicker(state = datePickerState) }
+    }
+
+    if (showTimePicker) {
+        val cal = Calendar.getInstance().apply { timeInMillis = fecha }
+        val timePickerState = rememberTimePickerState(
+            initialHour = cal.get(Calendar.HOUR_OF_DAY),
+            initialMinute = cal.get(Calendar.MINUTE),
+            is24Hour = false
+        )
+        
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    val calNew = Calendar.getInstance().apply {
+                        timeInMillis = fecha
+                        set(Calendar.HOUR_OF_DAY, timePickerState.hour)
+                        set(Calendar.MINUTE, timePickerState.minute)
+                    }
+                    fecha = calNew.timeInMillis
+                    showTimePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimePicker = false }) { Text("Cancelar") }
+            },
+            text = {
+                TimePicker(state = timePickerState)
+            }
+        )
     }
 
     AlertDialog(
@@ -294,6 +347,26 @@ fun AddGastoDialog(
                         label = { Text("Monto ($)") },
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                    )
+                }
+
+                item {
+                    OutlinedTextField(
+                        value = sdf.format(Date(fecha)),
+                        onValueChange = { },
+                        label = { Text("Fecha y Hora") },
+                        modifier = Modifier.fillMaxWidth(),
+                        readOnly = true,
+                        trailingIcon = {
+                            Row {
+                                IconButton(onClick = { showDatePicker = true }) {
+                                    Icon(Icons.Default.DateRange, contentDescription = "Cambiar Fecha")
+                                }
+                                IconButton(onClick = { showTimePicker = true }) {
+                                    Icon(Icons.Default.Build, contentDescription = "Cambiar Hora") // Usamos Build como placeholder para reloj
+                                }
+                            }
+                        }
                     )
                 }
 
@@ -362,7 +435,7 @@ fun AddGastoDialog(
             }
         },
         confirmButton = {
-            Button(onClick = { onConfirm(categoria, monto.toDoubleOrNull() ?: 0.0, litros.toDoubleOrNull(), nota, photoUri) }) {
+            Button(onClick = { onConfirm(categoria, monto.toDoubleOrNull() ?: 0.0, litros.toDoubleOrNull(), fecha, nota, photoUri) }) {
                 Text(if (gasto == null) "Añadir" else "Actualizar")
             }
         },
@@ -404,9 +477,7 @@ fun MonthYearPicker(
                         set(Calendar.MONTH, m)
                         set(Calendar.DAY_OF_MONTH, 1)
                     }
-                    val label = SimpleDateFormat("MMMM yyyy", Locale.getDefault()).apply {
-                        timeZone = TimeZone.getTimeZone("UTC")
-                    }.format(cal.time)
+                    val label = SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(cal.time)
                     
                     DropdownMenuItem(
                         text = { Text(label.replaceFirstChar { it.uppercase() }) },

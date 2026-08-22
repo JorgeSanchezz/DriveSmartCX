@@ -1,5 +1,6 @@
 package com.drivesmart.cx.ui.mobile.screens
 
+import android.graphics.Color as AndroidColor
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
@@ -8,10 +9,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.drivesmart.cx.ui.viewmodel.DriveSmartViewModel
+import com.drivesmart.cx.data.local.entity.VehiculoEntity
+import com.drivesmart.cx.data.local.entity.ServicioEntity
+import com.drivesmart.cx.data.local.entity.TramiteEntity
 import com.drivesmart.cx.util.NumberFormatter
+import com.drivesmart.cx.util.VehicleBrand
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -30,7 +37,6 @@ fun DashboardScreen(
     onNavigateToInfoVehiculo: () -> Unit,
     onNavigateToGarage: () -> Unit,
     onNavigateToConfig: () -> Unit,
-    onNavigateToMicodus: () -> Unit,
     onEditVehicle: (Long) -> Unit
 ) {
     val vehicles by viewModel.allVehicles.collectAsState()
@@ -64,9 +70,7 @@ fun DashboardScreen(
                 val timeLeft = if (s.proximaFecha != null) s.proximaFecha!! - currentTime else Long.MAX_VALUE
                 
                 if (kmLeft <= servicioAlertKm || (timeLeft > 0 && timeLeft <= serviceDaysMs)) {
-                    val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).apply { 
-                        timeZone = TimeZone.getTimeZone("UTC") 
-                    }
+                    val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
                     val detail = if (kmLeft <= servicioAlertKm) "${NumberFormatter.formatKm(s.proximoKilometraje!!)} KM" 
                                  else sdf.format(Date(s.proximaFecha!!))
                     upcomingItems.add("Próximo servicio: ${s.nombre} ($detail)")
@@ -110,13 +114,13 @@ fun DashboardScreen(
                         modifier = Modifier.weight(1f)
                     )
                     if (currentVehicle != null) {
-                        val brand = com.drivesmart.cx.util.VehicleBrand.fromString(currentVehicle.marca)
+                        val brand = VehicleBrand.fromString(currentVehicle.marca)
                         val brandColor = if (currentVehicle.marca == "Otro" && currentVehicle.customColorHex != null) {
-                            try { androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(currentVehicle.customColorHex)) } catch (e: Exception) { brand.color }
+                            try { Color(AndroidColor.parseColor(currentVehicle.customColorHex)) } catch (e: Exception) { brand.color }
                         } else brand.color
                         
                         Icon(
-                            painter = androidx.compose.ui.res.painterResource(id = brand.iconRes),
+                            painter = painterResource(id = brand.iconRes),
                             contentDescription = currentVehicle.customMarca ?: brand.displayName,
                             tint = brandColor,
                             modifier = Modifier.size(48.dp)
@@ -188,13 +192,7 @@ fun DashboardScreen(
                         icon = Icons.Default.Place,
                         onClick = onNavigateToEstacionamiento
                     )
-                    MenuActionCard(
-                        modifier = Modifier.weight(1f),
-                        title = "GPS Track",
-                        icon = Icons.Default.LocationOn,
-                        onClick = onNavigateToMicodus
-                    )
-                    Spacer(modifier = Modifier.weight(1f))
+                    Spacer(modifier = Modifier.weight(2f))
                 }
             }
 
@@ -243,7 +241,7 @@ fun DashboardScreen(
                                 ) 
                             },
                             colors = ListItemDefaults.colors(
-                                containerColor = androidx.compose.ui.graphics.Color.Transparent
+                                containerColor = Color.Transparent
                             )
                         )
                     }
@@ -265,7 +263,7 @@ fun VehicleSelectorCard(vehicleName: String, placas: String, km: Double, onEdit:
             }
             IconButton(
                 onClick = onEdit,
-                modifier = Modifier.align(androidx.compose.ui.Alignment.TopEnd)
+                modifier = Modifier.align(Alignment.TopEnd)
             ) {
                 Icon(Icons.Default.Edit, contentDescription = "Editar Vehículo")
             }
@@ -281,7 +279,7 @@ fun MenuActionCard(modifier: Modifier, title: String, icon: ImageVector, onClick
             modifier = Modifier
                 .padding(16.dp)
                 .fillMaxWidth(),
-            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Icon(icon, contentDescription = null, modifier = Modifier.size(32.dp))
             Spacer(modifier = Modifier.height(8.dp))

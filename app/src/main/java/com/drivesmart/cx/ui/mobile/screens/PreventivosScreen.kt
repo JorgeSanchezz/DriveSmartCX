@@ -81,11 +81,7 @@ fun PreventivosScreen(viewModel: DriveSmartViewModel) {
 fun PreventivoCard(item: PreventivoEntity, onCheck: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
     val nextDate = item.ultimaRevision + (item.frecuenciaDias.toLong() * 24 * 60 * 60 * 1000)
     val isOverdue = System.currentTimeMillis() > nextDate
-    val sdf = remember { 
-        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).apply { 
-            timeZone = TimeZone.getTimeZone("UTC") 
-        } 
-    }
+    val sdf = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
 
     Card(
         modifier = Modifier.fillMaxWidth(),

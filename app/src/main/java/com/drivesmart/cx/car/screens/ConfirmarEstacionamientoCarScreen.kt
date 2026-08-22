@@ -54,9 +54,7 @@ class ConfirmarEstacionamientoCarScreen(
                     return@launch
                 }
                 
-                val fecha = SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).apply {
-                    timeZone = TimeZone.getTimeZone("UTC")
-                }.format(Date())
+                val fecha = SimpleDateFormat("dd/MM hh:mm a", Locale.getDefault()).format(Date())
                 driveSmartRepository.saveUbicacion(
                     com.drivesmart.cx.data.local.entity.UbicacionEntity(
                         vehiculoId = vehicle.id,

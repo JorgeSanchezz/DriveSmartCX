@@ -18,6 +18,4 @@ sealed class Screen(val route: String) {
     object Seguro : Screen("seguro")
     object Preventivos : Screen("preventivos")
     object SOSConfig : Screen("sos_config")
-    object MicodusLogin : Screen("micodus_login")
-    object MicodusVehicle : Screen("micodus_vehicle")
 }

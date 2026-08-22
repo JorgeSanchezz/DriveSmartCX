@@ -10,10 +10,13 @@ import com.drivesmart.cx.data.local.entity.ServicioEntity
 import com.drivesmart.cx.domain.repository.DriveSmartRepository
 import com.drivesmart.cx.domain.repository.VehicleRepository
 import com.drivesmart.cx.util.NumberFormatter
+import com.drivesmart.cx.util.VehicleBrand
+import com.drivesmart.cx.R
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
+import androidx.compose.ui.graphics.toArgb
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ServicioCarScreen(
@@ -22,13 +25,20 @@ class ServicioCarScreen(
     private val driveSmartRepository: DriveSmartRepository
 ) : Screen(carContext) {
 
-    private val brandColor = CarColor.createCustom(0xFF607D8B.toInt(), 0xFF607D8B.toInt())
+    private var brandColor = CarColor.createCustom(0xFF607D8B.toInt(), 0xFF607D8B.toInt())
     private var servicios: List<ServicioEntity> = emptyList()
 
     init {
         lifecycleScope.launch {
             vehicleRepository.getAllVehicles().flatMapLatest { vehicles ->
-                val id = vehicles.find { it.isSelected }?.id ?: vehicles.firstOrNull()?.id
+                val vehicle = vehicles.find { it.isSelected } ?: vehicles.firstOrNull()
+                val id = vehicle?.id
+                
+                vehicle?.let {
+                    val colorInt = VehicleBrand.fromString(it.marca).color.toArgb()
+                    brandColor = CarColor.createCustom(colorInt, colorInt)
+                }
+
                 if (id != null) driveSmartRepository.getServicios(id)
                 else flowOf(emptyList())
             }.collect {
@@ -39,15 +49,13 @@ class ServicioCarScreen(
     }
 
     override fun onGetTemplate(): Template {
-        val paneBuilder = Pane.Builder()
+        val listBuilder = ItemList.Builder()
 
         if (servicios.isEmpty()) {
-            paneBuilder.addRow(Row.Builder().setTitle("No hay servicios registrados").build())
+            listBuilder.addItem(Row.Builder().setTitle("No hay servicios registrados").build())
         } else {
             servicios.forEach { servicio ->
-                val sdf = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault()).apply {
-                    timeZone = java.util.TimeZone.getTimeZone("UTC")
-                }
+                val sdf = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
                 val lastInfo = "Último: ${NumberFormatter.formatKm(servicio.ultimoKilometraje)} KM"
                 val nextKm = servicio.proximoKilometraje?.let { NumberFormatter.formatKm(it) } ?: "---"
                 val nextDate = servicio.proximaFecha?.let { sdf.format(java.util.Date(it)) } ?: "---"
@@ -59,12 +67,12 @@ class ServicioCarScreen(
                     else -> brandColor
                 }
 
-                paneBuilder.addRow(
+                listBuilder.addItem(
                     Row.Builder()
                         .setTitle("${servicio.tipo}: ${servicio.nombre}")
                         .addText("Estatus: ${servicio.estatus} - $lastInfo")
                         .addText(nextInfo)
-                        .setImage(CarIcon.Builder(IconCompat.createWithResource(carContext, android.R.drawable.ic_menu_manage))
+                        .setImage(CarIcon.Builder(IconCompat.createWithResource(carContext, R.drawable.ic_car_service))
                             .setTint(statusColor)
                             .build())
                         .build()
@@ -72,10 +80,10 @@ class ServicioCarScreen(
             }
         }
 
-        return PaneTemplate.Builder(paneBuilder.build())
+        return ListTemplate.Builder()
+            .setSingleList(listBuilder.build())
             .setTitle("Estado del Vehículo")
             .setHeaderAction(Action.BACK)
             .build()
     }
 }
-

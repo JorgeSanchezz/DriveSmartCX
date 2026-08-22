@@ -40,9 +40,7 @@ fun ServiciosScreen(viewModel: DriveSmartViewModel) {
     var selectedServicio by remember { mutableStateOf<ServicioEntity?>(null) }
 
     val sdf = remember { 
-        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).apply { 
-            timeZone = TimeZone.getTimeZone("UTC") 
-        } 
+        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
     }
 
     Scaffold(
@@ -237,9 +235,7 @@ fun AddServicioDialog(
     }
 
     val sdf = remember { 
-        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).apply { 
-            timeZone = TimeZone.getTimeZone("UTC") 
-        } 
+        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
     }
 
     AlertDialog(

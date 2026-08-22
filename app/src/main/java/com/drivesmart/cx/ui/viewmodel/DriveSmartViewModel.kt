@@ -3,6 +3,7 @@ package com.drivesmart.cx.ui.viewmodel
 import android.content.Context
 import android.content.SharedPreferences
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.drivesmart.cx.data.local.entity.*
@@ -24,7 +25,7 @@ class DriveSmartViewModel @Inject constructor(
     private val sharedPreferences: SharedPreferences
 ) : ViewModel() {
 
-    private val _isBiometricEnabled = MutableStateFlow(sharedPreferences.getBoolean("biometric_enabled", true))
+    private val _isBiometricEnabled = MutableStateFlow(sharedPreferences.getBoolean("biometric_enabled", false))
     val isBiometricEnabled: StateFlow<Boolean> = _isBiometricEnabled.asStateFlow()
 
     private val _appPrimaryColor = MutableStateFlow(sharedPreferences.getString("app_primary_color", null))
@@ -38,7 +39,7 @@ class DriveSmartViewModel @Inject constructor(
     private val _isAuthenticatedSession = MutableStateFlow(false)
     val isAuthenticatedSession: StateFlow<Boolean> = _isAuthenticatedSession.asStateFlow()
 
-    private val _sosMessage = MutableStateFlow(sharedPreferences.getString("sos_message", "¡Emergencia! Esta es mi ubicación actual:") ?: "¡Emergencia! Esta es mi ubicación actual:")
+    private val _sosMessage = MutableStateFlow(sharedPreferences.getString("sos_message", "¡Necesito ayuda! Estoy en esta ubicación:") ?: "¡Necesito ayuda! Estoy en esta ubicación:")
     val sosMessage: StateFlow<String> = _sosMessage.asStateFlow()
 
     private val _tramiteAlertDays = MutableStateFlow(sharedPreferences.getInt("tramite_alert_days", 30))
@@ -47,7 +48,7 @@ class DriveSmartViewModel @Inject constructor(
     private val _servicioAlertKm = MutableStateFlow(sharedPreferences.getInt("servicio_alert_km", 1000))
     val servicioAlertKm: StateFlow<Int> = _servicioAlertKm.asStateFlow()
 
-    private val _servicioAlertDays = MutableStateFlow(sharedPreferences.getInt("servicio_alert_days", 90))
+    private val _servicioAlertDays = MutableStateFlow(sharedPreferences.getInt("servicio_alert_days", 15))
     val servicioAlertDays: StateFlow<Int> = _servicioAlertDays.asStateFlow()
 
     fun setTramiteAlertDays(days: Int) {
@@ -82,9 +83,12 @@ class DriveSmartViewModel @Inject constructor(
     val allVehicles: StateFlow<List<VehiculoEntity>?> = vehicleRepository.getAllVehicles()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    val selectedVehicleId: StateFlow<Long?> = allVehicles.map { vehicles ->
-        vehicles?.find { it.isSelected }?.id ?: vehicles?.firstOrNull()?.id
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+    val selectedVehicleId: StateFlow<Long?> = allVehicles
+        .map { vehicles ->
+            // Prioridad: 1. El flag isSelected en DB, 2. El primer vehículo de la lista
+            vehicles?.find { it.isSelected }?.id ?: vehicles?.firstOrNull()?.id
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     val currentGastos: StateFlow<List<GastoEntity>> = selectedVehicleId.flatMapLatest { id ->
         if (id != null) driveSmartRepository.getGastos(id)
@@ -136,13 +140,10 @@ class DriveSmartViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val categories: StateFlow<List<String>> = currentGastos.map { gastos ->
-        val defaults = listOf("Gasolina", "Casetas", "Comida", "Refacciones")
+        val static = listOf("Gasolina", "Mantenimiento", "Seguro", "Trámites", "Lavado", "Estacionamiento", "Otros")
         val otherCategories = gastos.map { it.categoria }
-            .filter { it !in defaults }
-            .distinct()
-            .sorted()
-        defaults + otherCategories
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), listOf("Gasolina", "Casetas", "Comida", "Refacciones"))
+        (static + otherCategories).distinct()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun exportBackup(context: Context, uri: Uri) {
         viewModelScope.launch {
@@ -156,12 +157,27 @@ class DriveSmartViewModel @Inject constructor(
 
     fun importBackup(context: Context, uri: Uri) {
         viewModelScope.launch {
-            val json = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
-            if (json != null) {
-                val data = BackupHelper.importFromJson(json)
-                if (data != null) {
-                    driveSmartRepository.restoreAllData(data)
+            try {
+                val json = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                if (json != null) {
+                    val data = BackupHelper.importFromJson(json)
+                    if (data != null && data.vehicles.isNotEmpty()) {
+                        driveSmartRepository.restoreAllData(data)
+                        
+                        // IMPORTANTE: Resetear el ID del vehículo seleccionado tras la importación
+                        // para que la UI no se quede buscando un ID viejo.
+                        val newSelectedId = data.vehicles.find { it.isSelected }?.id ?: data.vehicles.first().id
+                        selectVehicle(newSelectedId)
+                        
+                        Log.d("DriveSmartVM", "Importación exitosa. Vehículo seleccionado: $newSelectedId")
+                    } else if (data != null && data.vehicles.isEmpty()) {
+                        Log.w("DriveSmartVM", "El respaldo no contiene vehículos.")
+                    } else {
+                        Log.e("DriveSmartVM", "Error: El JSON de respaldo no es válido.")
+                    }
                 }
+            } catch (e: Exception) {
+                Log.e("DriveSmartVM", "Error al importar respaldo", e)
             }
         }
     }
@@ -181,37 +197,32 @@ class DriveSmartViewModel @Inject constructor(
     }
 
     fun selectVehicle(id: Long) {
+        sharedPreferences.edit().putLong("selected_vehicle_id", id).apply()
+        
+        // Sincronizar con la base de datos para que Android Auto lo vea
         viewModelScope.launch {
-            val all = allVehicles.value ?: return@launch
-            all.forEach { v ->
-                vehicleRepository.saveVehicle(v.copy(isSelected = v.id == id))
+            allVehicles.value?.forEach { v ->
+                val shouldBeSelected = v.id == id
+                if (v.isSelected != shouldBeSelected) {
+                    vehicleRepository.saveVehicle(v.copy(isSelected = shouldBeSelected))
+                }
             }
         }
     }
 
-    fun addVehicle(nombre: String, placas: String, vin: String, modelo: String, anio: Int, km: Double, marca: String, tipo: String, customMarca: String?, customColor: String?) {
+    fun addVehicle(
+        nombre: String, placas: String, vin: String, modelo: String, 
+        anio: Int, kilometraje: Double, marca: String, tipo: String,
+        customMarca: String? = null, customColor: String? = null
+    ) {
         viewModelScope.launch {
-            // Deseleccionar otros
-            val all = allVehicles.value ?: emptyList()
-            all.forEach { v ->
-                if (v.isSelected) vehicleRepository.saveVehicle(v.copy(isSelected = false))
-            }
-            
-            vehicleRepository.saveVehicle(
-                VehiculoEntity(
-                    nombre = nombre, 
-                    placas = placas, 
-                    vin = vin, 
-                    modelo = modelo, 
-                    anio = anio, 
-                    kilometrajeActual = km,
-                    marca = marca,
-                    tipo = tipo,
-                    customMarca = customMarca,
-                    customColorHex = customColor,
-                    isSelected = true
-                )
+            val v = VehiculoEntity(
+                nombre = nombre, placas = placas, vin = vin, modelo = modelo,
+                anio = anio, kilometrajeActual = kilometraje, marca = marca, tipo = tipo,
+                customMarca = customMarca, customColorHex = customColor
             )
+            val id = vehicleRepository.saveVehicle(v)
+            selectVehicle(id)
         }
     }
 
@@ -227,20 +238,19 @@ class DriveSmartViewModel @Inject constructor(
         }
     }
 
-    fun addGasto(categoria: String, monto: Double, litros: Double?, nota: String?, photoUri: String? = null) {
-        val vehiculoId = selectedVehicleId.value ?: return
+    fun addGasto(categoria: String, monto: Double, litros: Double?, nota: String?, photoUri: String?, customFecha: Long? = null) {
+        val id = selectedVehicleId.value ?: return
         viewModelScope.launch {
-            driveSmartRepository.addGasto(
-                GastoEntity(
-                    vehiculoId = vehiculoId,
-                    categoria = categoria,
-                    monto = monto,
-                    litros = litros,
-                    fecha = System.currentTimeMillis(),
-                    nota = nota,
-                    photoUri = photoUri
-                )
+            val gasto = GastoEntity(
+                vehiculoId = id,
+                categoria = categoria,
+                monto = monto,
+                litros = litros,
+                fecha = customFecha ?: System.currentTimeMillis(),
+                nota = nota,
+                photoUri = photoUri
             )
+            driveSmartRepository.addGasto(gasto)
         }
     }
 
@@ -258,35 +268,19 @@ class DriveSmartViewModel @Inject constructor(
 
     fun saveServicio(
         id: Long = 0,
-        tipo: String,
-        nombre: String,
-        ultimoKm: Double,
-        proximoKm: Double?,
-        ultimaFecha: Long,
-        proximaFecha: Long?,
-        componentes: String?,
-        estatus: String,
-        monto: Double?,
-        photoUri: String? = null
+        nombre: String, tipo: String, ultimoKm: Double, proximoKm: Double?,
+        ultimaFecha: Long, proximaFecha: Long?, componentes: String?,
+        estatus: String, monto: Double?, photoUri: String?
     ) {
-        val vehiculoId = selectedVehicleId.value ?: return
+        val vId = selectedVehicleId.value ?: return
         viewModelScope.launch {
-            driveSmartRepository.saveServicio(
-                ServicioEntity(
-                    id = id,
-                    vehiculoId = vehiculoId,
-                    tipo = tipo,
-                    nombre = nombre,
-                    ultimoKilometraje = ultimoKm,
-                    proximoKilometraje = proximoKm,
-                    ultimaFecha = ultimaFecha,
-                    proximaFecha = proximaFecha,
-                    componentesIncluidos = componentes,
-                    estatus = estatus,
-                    monto = monto,
-                    photoUri = photoUri
-                )
+            val s = ServicioEntity(
+                id = id, vehiculoId = vId, nombre = nombre, tipo = tipo,
+                ultimoKilometraje = ultimoKm, proximoKilometraje = proximoKm,
+                ultimaFecha = ultimaFecha, proximaFecha = proximaFecha,
+                componentesIncluidos = componentes, estatus = estatus, monto = monto, photoUri = photoUri
             )
+            driveSmartRepository.saveServicio(s)
         }
     }
 
@@ -296,27 +290,14 @@ class DriveSmartViewModel @Inject constructor(
         }
     }
 
-    fun saveTramite(
-        id: Long = 0,
-        nombre: String,
-        fechaVencimiento: Long,
-        estatus: String,
-        descripcion: String?,
-        photoUri: String? = null
-    ) {
-        val vehiculoId = selectedVehicleId.value ?: return
+    fun saveTramite(id: Long = 0, nombre: String, fechaVencimiento: Long, estatus: String, descripcion: String?, photoUri: String?) {
+        val vId = selectedVehicleId.value ?: return
         viewModelScope.launch {
-            driveSmartRepository.saveTramite(
-                TramiteEntity(
-                    id = id,
-                    vehiculoId = vehiculoId,
-                    nombre = nombre,
-                    fechaVencimiento = fechaVencimiento,
-                    estatus = estatus,
-                    descripcion = descripcion,
-                    photoUri = photoUri
-                )
+            val t = TramiteEntity(
+                id = id, vehiculoId = vId, nombre = nombre,
+                fechaVencimiento = fechaVencimiento, estatus = estatus, descripcion = descripcion, photoUri = photoUri
             )
+            driveSmartRepository.saveTramite(t)
         }
     }
 
@@ -326,12 +307,11 @@ class DriveSmartViewModel @Inject constructor(
         }
     }
 
-    fun saveContacto(id: Long = 0, nombre: String, tipo: String, telefono: String) {
-        val vehiculoId = selectedVehicleId.value ?: return
+    fun saveContacto(id: Long = 0, nombre: String, telefono: String, tipo: String) {
+        val vId = selectedVehicleId.value ?: return
         viewModelScope.launch {
-            driveSmartRepository.saveContacto(
-                ContactoEntity(id = id, vehiculoId = vehiculoId, nombre = nombre, tipo = tipo, telefono = telefono)
-            )
+            val c = ContactoEntity(id = id, vehiculoId = vId, nombre = nombre, telefono = telefono, tipo = tipo)
+            driveSmartRepository.saveContacto(c)
         }
     }
 
@@ -342,11 +322,10 @@ class DriveSmartViewModel @Inject constructor(
     }
 
     fun saveUbicacion(id: Long = 0, nombre: String, lat: Double, lng: Double) {
-        val vehiculoId = selectedVehicleId.value ?: return
+        val vId = selectedVehicleId.value ?: return
         viewModelScope.launch {
-            driveSmartRepository.saveUbicacion(
-                UbicacionEntity(id = id, vehiculoId = vehiculoId, nombre = nombre, latitud = lat, longitud = lng, fechaGuardado = System.currentTimeMillis())
-            )
+            val u = UbicacionEntity(id = id, vehiculoId = vId, nombre = nombre, latitud = lat, longitud = lng, fechaGuardado = System.currentTimeMillis())
+            driveSmartRepository.saveUbicacion(u)
         }
     }
 
@@ -357,35 +336,33 @@ class DriveSmartViewModel @Inject constructor(
     }
 
     fun startViaje(lat: Double, lng: Double) {
-        val vehiculoId = selectedVehicleId.value ?: return
+        val vId = selectedVehicleId.value ?: return
         viewModelScope.launch {
-            driveSmartRepository.startViaje(
-                BitacoraEntity(
-                    vehiculoId = vehiculoId,
-                    fechaInicio = System.currentTimeMillis(),
-                    fechaFin = null,
-                    latInicio = lat,
-                    lngInicio = lng,
-                    latFin = null,
-                    lngFin = null,
-                    distancia = null,
-                    duracion = null
-                )
+            val v = BitacoraEntity(
+                vehiculoId = vId,
+                fechaInicio = System.currentTimeMillis(),
+                fechaFin = null,
+                latInicio = lat,
+                lngInicio = lng,
+                latFin = null,
+                lngFin = null,
+                distancia = null,
+                duracion = null
             )
+            driveSmartRepository.startViaje(v)
         }
     }
 
     fun endViaje(lat: Double, lng: Double) {
         val viaje = activeViaje.value ?: return
         viewModelScope.launch {
-            driveSmartRepository.updateViaje(
-                viaje.copy(
-                    fechaFin = System.currentTimeMillis(),
-                    latFin = lat,
-                    lngFin = lng,
-                    duracion = System.currentTimeMillis() - viaje.fechaInicio
-                )
+            val updated = viaje.copy(
+                fechaFin = System.currentTimeMillis(),
+                latFin = lat,
+                lngFin = lng,
+                duracion = System.currentTimeMillis() - viaje.fechaInicio
             )
+            driveSmartRepository.updateViaje(updated)
         }
     }
 
@@ -395,54 +372,26 @@ class DriveSmartViewModel @Inject constructor(
         }
     }
 
-    fun saveSeguro(
-        id: Long = 0,
-        aseguradora: String,
-        poliza: String,
-        inicio: Long,
-        vencimiento: Long,
-        tel: String,
-        cobertura: String,
-        notas: String?,
-        documentUri: String? = null
-    ) {
-        val vehiculoId = selectedVehicleId.value ?: return
+    fun saveSeguro(id: Long = 0, aseguradora: String, poliza: String, inicio: Long, vencimiento: Long, tel: String, cobertura: String, notas: String?, documentUri: String?) {
+        val vId = selectedVehicleId.value ?: return
         viewModelScope.launch {
-            driveSmartRepository.saveSeguro(
-                SeguroEntity(
-                    id = id,
-                    vehiculoId = vehiculoId,
-                    aseguradora = aseguradora,
-                    numeroPoliza = poliza,
-                    fechaInicio = inicio,
-                    fechaVencimiento = vencimiento,
-                    telefonoSiniestros = tel,
-                    tipoCobertura = cobertura,
-                    notas = notas,
-                    documentUri = documentUri
-                )
+            val s = SeguroEntity(
+                id = id, vehiculoId = vId, aseguradora = aseguradora, numeroPoliza = poliza,
+                fechaInicio = inicio, fechaVencimiento = vencimiento, telefonoSiniestros = tel,
+                tipoCobertura = cobertura, notas = notas, documentUri = documentUri
             )
+            driveSmartRepository.saveSeguro(s)
         }
     }
 
-    fun savePreventivo(
-        id: Long = 0,
-        nombre: String,
-        dias: Int,
-        notas: String? = null
-    ) {
-        val vehiculoId = selectedVehicleId.value ?: return
+    fun savePreventivo(id: Long = 0, nombre: String, dias: Int, notas: String?) {
+        val vId = selectedVehicleId.value ?: return
         viewModelScope.launch {
-            driveSmartRepository.savePreventivo(
-                PreventivoEntity(
-                    id = id,
-                    vehiculoId = vehiculoId,
-                    nombre = nombre,
-                    ultimaRevision = System.currentTimeMillis(),
-                    frecuenciaDias = dias,
-                    notas = notas
-                )
+            val p = PreventivoEntity(
+                id = id, vehiculoId = vId, nombre = nombre, 
+                ultimaRevision = System.currentTimeMillis(), frecuenciaDias = dias, notas = notas
             )
+            driveSmartRepository.savePreventivo(p)
         }
     }
 
@@ -459,14 +408,10 @@ class DriveSmartViewModel @Inject constructor(
     }
 
     fun saveSOSContact(nombre: String, telefono: String) {
-        val vehiculoId = selectedVehicleId.value ?: return
+        val vId = selectedVehicleId.value ?: return
         viewModelScope.launch {
-            val contacts = currentSOSContacts.value
-            if (contacts.size < 5) {
-                driveSmartRepository.saveSOSContact(
-                    ContactoEmergenciaEntity(vehiculoId = vehiculoId, nombre = nombre, telefono = telefono)
-                )
-            }
+            val c = ContactoEmergenciaEntity(vehiculoId = vId, nombre = nombre, telefono = telefono)
+            driveSmartRepository.saveSOSContact(c)
         }
     }
 

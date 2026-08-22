@@ -1,6 +1,15 @@
 package com.drivesmart.cx.domain.repository
 
-import com.drivesmart.cx.data.local.entity.*
+import com.drivesmart.cx.data.local.entity.BitacoraEntity
+import com.drivesmart.cx.data.local.entity.ContactoEmergenciaEntity
+import com.drivesmart.cx.data.local.entity.ContactoEntity
+import com.drivesmart.cx.data.local.entity.GastoEntity
+import com.drivesmart.cx.data.local.entity.PreventivoEntity
+import com.drivesmart.cx.data.local.entity.SeguroEntity
+import com.drivesmart.cx.data.local.entity.ServicioEntity
+import com.drivesmart.cx.data.local.entity.TramiteEntity
+import com.drivesmart.cx.data.local.entity.UbicacionEntity
+import com.drivesmart.cx.data.local.entity.VehiculoEntity
 import kotlinx.coroutines.flow.Flow
 
 interface DriveSmartRepository {

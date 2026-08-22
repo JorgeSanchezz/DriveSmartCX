@@ -9,14 +9,14 @@ plugins {
 
 android {
     namespace = "com.drivesmart.cx"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.drivesmart.cx"
         minSdk = 26
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        targetSdk = 35
+        versionCode = 4
+        versionName = "1.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

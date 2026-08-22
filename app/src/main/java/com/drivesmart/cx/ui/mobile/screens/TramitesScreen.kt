@@ -37,9 +37,7 @@ fun TramitesScreen(viewModel: DriveSmartViewModel) {
     var selectedTramite by remember { mutableStateOf<TramiteEntity?>(null) }
     
     val sdf = remember { 
-        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).apply { 
-            timeZone = TimeZone.getTimeZone("UTC") 
-        } 
+        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
     }
 
     Scaffold(
@@ -147,9 +145,7 @@ fun AddTramiteDialog(
     var showDatePicker by remember { mutableStateOf(false) }
 
     val sdf = remember { 
-        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).apply { 
-            timeZone = TimeZone.getTimeZone("UTC") 
-        } 
+        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
     }
 
     val context = LocalContext.current

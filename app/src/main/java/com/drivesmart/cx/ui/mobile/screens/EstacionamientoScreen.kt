@@ -28,14 +28,10 @@ fun EstacionamientoScreen(viewModel: DriveSmartViewModel) {
     val context = LocalContext.current
     
     val sdf = remember { 
-        SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).apply { 
-            timeZone = TimeZone.getTimeZone("UTC") 
-        } 
+        SimpleDateFormat("dd/MM hh:mm a", Locale.getDefault())
     }
     val sdfFull = remember { 
-        SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).apply { 
-            timeZone = TimeZone.getTimeZone("UTC") 
-        } 
+        SimpleDateFormat("dd/MM/yyyy hh:mm a", Locale.getDefault())
     }
 
     Scaffold(

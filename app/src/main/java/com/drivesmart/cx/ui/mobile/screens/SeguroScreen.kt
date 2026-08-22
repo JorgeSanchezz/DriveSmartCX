@@ -87,11 +87,7 @@ fun SeguroScreen(viewModel: DriveSmartViewModel) {
 @Composable
 fun SeguroDetail(seguro: SeguroEntity, modifier: Modifier = Modifier, onUpdate: (SeguroEntity) -> Unit) {
     val context = LocalContext.current
-    val sdf = remember { 
-        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).apply { 
-            timeZone = TimeZone.getTimeZone("UTC") 
-        } 
-    }
+    val sdf = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
 
     val documentPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -269,11 +265,7 @@ fun SeguroForm(
     }
     
     var vencimiento by remember { mutableLongStateOf(seguro?.fechaVencimiento ?: System.currentTimeMillis()) }
-    val sdf = remember { 
-        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).apply { 
-            timeZone = TimeZone.getTimeZone("UTC") 
-        } 
-    }
+    val sdf = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
 
     var showDatePicker by remember { mutableStateOf(false) }
 

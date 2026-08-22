@@ -3,7 +3,6 @@ package com.drivesmart.cx.car.screens
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.model.*
-import androidx.car.app.model.CarColor
 import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.lifecycleScope
 import com.drivesmart.cx.data.local.entity.BitacoraEntity
@@ -12,8 +11,10 @@ import com.drivesmart.cx.domain.repository.DriveSmartRepository
 import com.drivesmart.cx.domain.repository.VehicleRepository
 import com.drivesmart.cx.util.LocationHelper
 import com.drivesmart.cx.util.NumberFormatter
-import kotlinx.coroutines.flow.firstOrNull
+import com.drivesmart.cx.util.VehicleBrand
+import com.drivesmart.cx.R
 import kotlinx.coroutines.launch
+import androidx.compose.ui.graphics.toArgb
 
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flatMapLatest
@@ -26,7 +27,8 @@ class MainScreen(
     private val driveSmartRepository: DriveSmartRepository
 ) : Screen(carContext) {
 
-    private val brandColor = CarColor.createCustom(0xFF607D8B.toInt(), 0xFF607D8B.toInt())
+    private var brandColor = CarColor.createCustom(0xFF607D8B.toInt(), 0xFF607D8B.toInt())
+    private val alertColor = CarColor.RED
 
     private var vehicleName: String = "Cargando..."
     private var vehicleKm: String = "---"
@@ -42,6 +44,11 @@ class MainScreen(
                     vehicleName = vehicle?.nombre ?: "Sin Vehículo"
                     vehicleKm = vehicle?.let { "${NumberFormatter.formatKm(it.kilometrajeActual)} KM" } ?: "---"
                     
+                    vehicle?.let {
+                        val colorInt = VehicleBrand.fromString(it.marca).color.toArgb()
+                        brandColor = CarColor.createCustom(colorInt, colorInt)
+                    }
+
                     if (vehicle != null) {
                         driveSmartRepository.getBitacora(vehicle.id)
                     } else {
@@ -65,95 +72,100 @@ class MainScreen(
                 .build()
         }
 
-        val brand = com.drivesmart.cx.util.VehicleBrand.fromString(current.marca)
+        val brand = VehicleBrand.fromString(current.marca)
         val headerAction = Action.Builder()
             .setIcon(createIcon(brand.iconRes, CarColor.DEFAULT))
             .build()
 
-        val itemListBuilder = ItemList.Builder()
+        // ActionStrip (Iconos pequeños arriba a la derecha, como en el móvil)
+        val actionStrip = ActionStrip.Builder()
+            .addAction(
+                Action.Builder()
+                    .setIcon(createIcon(R.drawable.ic_car_garage))
+                    .setOnClickListener { screenManager.push(GarageCarScreen(carContext, vehicleRepository)) }
+                    .build()
+            )
+            .addAction(
+                Action.Builder()
+                    .setIcon(createIcon(R.drawable.ic_car_info))
+                    .setOnClickListener { screenManager.push(InformacionVehiculoCarScreen(carContext, vehicleRepository)) }
+                    .build()
+            )
+            .build()
 
-        itemListBuilder.addItem(
-            Row.Builder()
-                .setTitle("Registrar Gasto")
-                .addText("Gasolina, Casetas, Comida...")
-                .setImage(createIcon(android.R.drawable.ic_menu_add))
+        val gridBuilder = ItemList.Builder()
+
+        // FILA SUPERIOR
+        // 1. Registrar Gasto
+        gridBuilder.addItem(
+            GridItem.Builder()
+                .setTitle("Gastos")
+                .setText("Registrar")
+                .setImage(createIcon(R.drawable.ic_car_add))
                 .setOnClickListener { screenManager.push(GastosCarScreen(carContext, vehicleRepository, driveSmartRepository)) }
                 .build()
         )
 
-        itemListBuilder.addItem(
-            Row.Builder()
-                .setTitle(if (activeViaje == null) "Iniciar Viaje" else "Terminar Viaje")
-                .addText(if (activeViaje == null) "Registrar inicio de recorrido" else "Guardar destino y finalizar")
-                .setImage(createIcon(if (activeViaje == null) android.R.drawable.ic_media_play else android.R.drawable.ic_media_pause))
+        // 2. Viaje (Dinámico)
+        val viajeTitle = if (activeViaje == null) "Iniciar" else "Terminar"
+        val viajeIcon = if (activeViaje == null) R.drawable.ic_car_play else R.drawable.ic_car_pause
+        gridBuilder.addItem(
+            GridItem.Builder()
+                .setTitle(viajeTitle)
+                .setText("Viaje")
+                .setImage(createIcon(viajeIcon))
                 .setOnClickListener {
-                    if (activeViaje == null) {
-                        startViaje()
-                    } else {
-                        endViaje()
-                    }
+                    if (activeViaje == null) startViaje() else endViaje()
                 }
                 .build()
         )
 
-        itemListBuilder.addItem(
-            Row.Builder()
-                .setTitle("Estado de Servicio")
-                .addText("Verificar componentes del vehículo")
-                .setImage(createIcon(android.R.drawable.ic_menu_manage))
-                .setOnClickListener { screenManager.push(ServicioCarScreen(carContext, vehicleRepository, driveSmartRepository)) }
-                .build()
-        )
-
-        itemListBuilder.addItem(
-            Row.Builder()
-                .setTitle("Información de Seguro")
-                .addText("Póliza y contacto de emergencia")
-                .setImage(createIcon(android.R.drawable.ic_dialog_info))
-                .setOnClickListener { screenManager.push(SeguroCarScreen(carContext, vehicleRepository, driveSmartRepository)) }
-                .build()
-        )
-
-        itemListBuilder.addItem(
-            Row.Builder()
-                .setTitle("Emergencias")
-                .addText("Contactos de emergencia y seguro")
-                .setImage(createIcon(android.R.drawable.ic_dialog_alert, CarColor.RED))
-                .setOnClickListener { screenManager.push(EmergenciasCarScreen(carContext, vehicleRepository, driveSmartRepository)) }
-                .build()
-        )
-
-        itemListBuilder.addItem(
-            Row.Builder()
-                .setTitle("Guardar Parking")
-                .addText("Recordar ubicación actual")
-                .setImage(createIcon(android.R.drawable.ic_dialog_map))
+        // 3. Parking
+        gridBuilder.addItem(
+            GridItem.Builder()
+                .setTitle("Parking")
+                .setText("Guardar")
+                .setImage(createIcon(R.drawable.ic_car_parking))
                 .setOnClickListener { screenManager.push(ConfirmarEstacionamientoCarScreen(carContext, vehicleRepository, driveSmartRepository)) }
                 .build()
         )
 
-        itemListBuilder.addItem(
-            Row.Builder()
-                .setTitle("Info del Vehículo")
-                .addText("Resumen técnico de tu Vehículo")
-                .setImage(createIcon(android.R.drawable.ic_menu_info_details))
-                .setOnClickListener { screenManager.push(InformacionVehiculoCarScreen(carContext, vehicleRepository)) }
+        // FILA INFERIOR
+        // 4. Servicio
+        gridBuilder.addItem(
+            GridItem.Builder()
+                .setTitle("Servicio")
+                .setText("Estado")
+                .setImage(createIcon(R.drawable.ic_car_service))
+                .setOnClickListener { screenManager.push(ServicioCarScreen(carContext, vehicleRepository, driveSmartRepository)) }
                 .build()
         )
 
-        itemListBuilder.addItem(
-            Row.Builder()
-                .setTitle("Mi Garage")
-                .addText("Cambiar de vehículo o moto")
-                .setImage(createIcon(android.R.drawable.ic_menu_directions))
-                .setOnClickListener { screenManager.push(GarageCarScreen(carContext, vehicleRepository)) }
+        // 5. Seguro
+        gridBuilder.addItem(
+            GridItem.Builder()
+                .setTitle("Seguro")
+                .setText("Póliza")
+                .setImage(createIcon(R.drawable.ic_car_insurance))
+                .setOnClickListener { screenManager.push(SeguroCarScreen(carContext, vehicleRepository, driveSmartRepository)) }
                 .build()
         )
 
-        return ListTemplate.Builder()
-            .setSingleList(itemListBuilder.build())
+        // 6. Emergencias (Rojo)
+        gridBuilder.addItem(
+            GridItem.Builder()
+                .setTitle("SOS")
+                .setText("Emergencia")
+                .setImage(createIcon(R.drawable.ic_car_sos, alertColor))
+                .setOnClickListener { screenManager.push(EmergenciasCarScreen(carContext, vehicleRepository, driveSmartRepository)) }
+                .build()
+        )
+
+        return GridTemplate.Builder()
+            .setSingleList(gridBuilder.build())
             .setTitle("DriveSmartCX - $vehicleName ($vehicleKm)")
             .setHeaderAction(headerAction)
+            .setActionStrip(actionStrip)
             .build()
     }
 
@@ -212,4 +224,3 @@ class MainScreen(
         }
     }
 }
-

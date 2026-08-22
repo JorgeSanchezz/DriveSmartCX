@@ -11,11 +11,16 @@ import androidx.lifecycle.lifecycleScope
 import com.drivesmart.cx.data.local.entity.ContactoEntity
 import com.drivesmart.cx.domain.repository.DriveSmartRepository
 import com.drivesmart.cx.domain.repository.VehicleRepository
+import com.drivesmart.cx.util.VehicleBrand
+import com.drivesmart.cx.R
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import androidx.compose.ui.graphics.toArgb
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class EmergenciasCarScreen(
@@ -24,15 +29,23 @@ class EmergenciasCarScreen(
     private val driveSmartRepository: DriveSmartRepository
 ) : Screen(carContext) {
 
-    private val brandColor = CarColor.createCustom(0xFF607D8B.toInt(), 0xFF607D8B.toInt())
+    private var brandColor = CarColor.createCustom(0xFF607D8B.toInt(), 0xFF607D8B.toInt())
     private var contactos: List<ContactoEntity> = emptyList()
     private var sosContacts: List<com.drivesmart.cx.data.local.entity.ContactoEmergenciaEntity> = emptyList()
+
+    // Estado para la cuenta regresiva
+    private var isCountingDown = false
+    private var countdownValue = 5
+    private var countdownJob: Job? = null
 
     init {
         lifecycleScope.launch {
             vehicleRepository.getAllVehicles().flatMapLatest { vehicles ->
                 val vehicle = vehicles.find { it.isSelected } ?: vehicles.firstOrNull()
                 if (vehicle != null) {
+                    val colorInt = VehicleBrand.fromString(vehicle.marca).color.toArgb()
+                    brandColor = CarColor.createCustom(colorInt, colorInt)
+                    
                     driveSmartRepository.getContactos(vehicle.id).flatMapLatest { c ->
                         driveSmartRepository.getSOSContacts(vehicle.id).map { s ->
                             Pair(c, s)
@@ -51,42 +64,59 @@ class EmergenciasCarScreen(
     }
 
     override fun onGetTemplate(): Template {
-        val listBuilder = ItemList.Builder()
-
-        if (sosContacts.isNotEmpty()) {
-            listBuilder.addItem(
-                Row.Builder()
-                    .setTitle("BOTÓN SOS - ENVIAR UBICACIÓN")
-                    .addText("Envía un SMS a tus ${sosContacts.size} contactos de emergencia")
-                    .setImage(CarIcon.Builder(IconCompat.createWithResource(carContext, android.R.drawable.ic_dialog_alert))
-                        .setTint(CarColor.RED)
-                        .build())
-                    .setOnClickListener {
-                        val message = carContext.getSharedPreferences("drivesmart_prefs", android.content.Context.MODE_PRIVATE)
-                            .getString("sos_message", "¡Emergencia! Esta es mi ubicación actual:") ?: "¡Emergencia! Esta es mi ubicación actual:"
-                        com.drivesmart.cx.util.NotificationHelper.sendSOS(carContext, sosContacts, message)
-                    }
-                    .build()
-            )
+        // Pantalla de cuenta regresiva
+        if (isCountingDown) {
+            return MessageTemplate.Builder("Se enviará un SMS de emergencia con tu ubicación en $countdownValue segundos a todos tus contactos SOS.")
+                .setTitle("¡ALERTA SOS EN CURSO!")
+                .setIcon(CarIcon.Builder(IconCompat.createWithResource(carContext, R.drawable.ic_car_sos))
+                    .setTint(CarColor.RED)
+                    .build())
+                .addAction(
+                    Action.Builder()
+                        .setTitle("CANCELAR ENVÍO")
+                        .setOnClickListener { cancelSOS() }
+                        .build()
+                )
+                .setHeaderAction(Action.BACK)
+                .build()
         }
 
-        if (contactos.isEmpty() && sosContacts.isEmpty()) {
-            listBuilder.addItem(
-                Row.Builder()
-                    .setTitle("Sin contactos de asistencia")
-                    .addText("Registra tu seguro en la app móvil")
-                    .setImage(CarIcon.Builder(IconCompat.createWithResource(carContext, android.R.drawable.ic_dialog_info))
+        val gridBuilder = ItemList.Builder()
+        val templateBuilder = GridTemplate.Builder()
+
+        // 1. Configurar ActionStrip solo si hay contactos SOS
+        if (sosContacts.isNotEmpty()) {
+            val actionStrip = ActionStrip.Builder()
+                .addAction(
+                    Action.Builder()
+                        .setTitle("SOS SMS")
+                        .setIcon(CarIcon.Builder(IconCompat.createWithResource(carContext, R.drawable.ic_car_sos))
+                            .setTint(CarColor.RED)
+                            .build())
+                        .setOnClickListener { startSOSCountdown() }
+                        .build()
+                )
+                .build()
+            templateBuilder.setActionStrip(actionStrip)
+        }
+
+        if (contactos.isEmpty()) {
+            gridBuilder.addItem(
+                GridItem.Builder()
+                    .setTitle("Sin contactos")
+                    .setText("Registra en móvil")
+                    .setImage(CarIcon.Builder(IconCompat.createWithResource(carContext, R.drawable.ic_car_info))
                         .setTint(brandColor)
                         .build())
                     .build()
             )
         } else {
             contactos.forEach { contacto ->
-                listBuilder.addItem(
-                    Row.Builder()
+                gridBuilder.addItem(
+                    GridItem.Builder()
                         .setTitle(contacto.nombre)
-                        .addText("${contacto.tipo}: ${contacto.telefono}")
-                        .setImage(CarIcon.Builder(IconCompat.createWithResource(carContext, android.R.drawable.ic_menu_call))
+                        .setText(contacto.tipo)
+                        .setImage(CarIcon.Builder(IconCompat.createWithResource(carContext, R.drawable.ic_car_call))
                             .setTint(CarColor.RED)
                             .build())
                         .setOnClickListener {
@@ -100,11 +130,45 @@ class EmergenciasCarScreen(
             }
         }
 
-        return ListTemplate.Builder()
-            .setSingleList(listBuilder.build())
-            .setTitle("Asistencia")
+        return templateBuilder
+            .setSingleList(gridBuilder.build())
+            .setTitle("Asistencia y Emergencias")
             .setHeaderAction(Action.BACK)
             .build()
     }
-}
 
+    private fun startSOSCountdown() {
+        isCountingDown = true
+        countdownValue = 5
+        invalidate()
+
+        countdownJob = lifecycleScope.launch {
+            while (countdownValue > 0) {
+                delay(1000)
+                countdownValue--
+                invalidate()
+            }
+            // Cuando llega a 0, enviar
+            performSendSOS()
+        }
+    }
+
+    private fun cancelSOS() {
+        countdownJob?.cancel()
+        isCountingDown = false
+        countdownValue = 5
+        androidx.car.app.CarToast.makeText(carContext, "Envío cancelado", androidx.car.app.CarToast.LENGTH_SHORT).show()
+        invalidate()
+    }
+
+    private fun performSendSOS() {
+        val message = carContext.getSharedPreferences("drivesmart_prefs", android.content.Context.MODE_PRIVATE)
+            .getString("sos_message", "¡Emergencia! Esta es mi ubicación actual:") ?: "¡Emergencia! Esta es mi ubicación actual:"
+        
+        com.drivesmart.cx.util.NotificationHelper.sendSOS(carContext, sosContacts, message)
+        
+        isCountingDown = false
+        invalidate()
+        androidx.car.app.CarToast.makeText(carContext, "¡Mensajes SOS Enviados!", androidx.car.app.CarToast.LENGTH_LONG).show()
+    }
+}
