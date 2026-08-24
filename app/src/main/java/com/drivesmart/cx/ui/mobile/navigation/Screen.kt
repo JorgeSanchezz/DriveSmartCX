@@ -18,4 +18,5 @@ sealed class Screen(val route: String) {
     object Seguro : Screen("seguro")
     object Preventivos : Screen("preventivos")
     object SOSConfig : Screen("sos_config")
+    object ErrorLogs : Screen("error_logs")
 }

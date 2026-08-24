@@ -37,8 +37,9 @@ fun GarageScreen(
         }
     ) { padding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.fillMaxSize().padding(padding),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(top = 16.dp, bottom = 80.dp, start = 16.dp, end = 16.dp)
         ) {
             items(currentVehicles) { vehicle ->
                 val isSelected = vehicle.id == (selectedId ?: currentVehicles.firstOrNull()?.id)

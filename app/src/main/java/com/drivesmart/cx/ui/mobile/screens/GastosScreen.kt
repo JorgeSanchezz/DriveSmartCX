@@ -20,12 +20,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.drivesmart.cx.data.local.entity.GastoEntity
 import com.drivesmart.cx.ui.mobile.components.FullScreenImageDialog
 import com.drivesmart.cx.ui.viewmodel.DriveSmartViewModel
+import com.drivesmart.cx.util.DateTimeUtils
+import com.drivesmart.cx.util.FileHelper
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -131,8 +134,9 @@ fun GastosScreen(viewModel: DriveSmartViewModel) {
             }
 
             LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 80.dp)
             ) {
                 if (availableMonths.isEmpty()) {
                     item {
@@ -243,15 +247,10 @@ fun AddGastoDialog(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         uri?.let {
-            try {
-                context.contentResolver.takePersistableUriPermission(
-                    it,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
-            } catch (e: Exception) {
-                e.printStackTrace()
+            val internalPath = FileHelper.copyFileToInternalStorage(context, it, "gastos")
+            if (internalPath != null) {
+                photoUri = internalPath
             }
-            photoUri = it.toString()
         }
     }
 
@@ -260,19 +259,18 @@ fun AddGastoDialog(
     val sdf = remember { SimpleDateFormat("dd/MM/yyyy hh:mm a", Locale.getDefault()) }
 
     if (showDatePicker) {
-        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = fecha)
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = DateTimeUtils.localToUtc(fecha))
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { 
                         val calOld = Calendar.getInstance().apply { timeInMillis = fecha }
-                        val calNew = Calendar.getInstance().apply { 
-                            timeInMillis = it 
-                            set(Calendar.HOUR_OF_DAY, calOld.get(Calendar.HOUR_OF_DAY))
-                            set(Calendar.MINUTE, calOld.get(Calendar.MINUTE))
-                        }
-                        fecha = calNew.timeInMillis 
+                        fecha = DateTimeUtils.combineDateUtcAndTimeLocal(
+                            it,
+                            calOld.get(Calendar.HOUR_OF_DAY),
+                            calOld.get(Calendar.MINUTE)
+                        )
                     }
                     showDatePicker = false
                 }) { Text("OK") }
@@ -336,7 +334,8 @@ fun AddGastoDialog(
                         value = categoria,
                         onValueChange = { categoria = it },
                         label = { Text("Otra categoría...") },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words)
                     )
                 }
 
@@ -387,7 +386,8 @@ fun AddGastoDialog(
                         value = nota,
                         onValueChange = { nota = it },
                         label = { Text(if (categoria == "Refacciones") "Descripción de la refacción" else "Nota") },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
                     )
                 }
 

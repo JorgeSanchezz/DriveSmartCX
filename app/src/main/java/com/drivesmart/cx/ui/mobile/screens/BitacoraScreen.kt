@@ -96,7 +96,10 @@ fun BitacoraScreen(viewModel: DriveSmartViewModel) {
 
             Text("Historial de Viajes", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
 
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(bottom = 32.dp)
+            ) {
                 val filteredBitacora = bitacora.filter { it.fechaFin != null }
                 items(filteredBitacora) { viaje ->
                     ViajeItem(viaje, sdfDate, sdfTime, onDelete = { viewModel.removeViaje(viaje) }, onShowMap = {

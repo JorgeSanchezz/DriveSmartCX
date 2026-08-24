@@ -57,6 +57,9 @@ object DataModule {
     fun provideContactoEmergenciaDao(db: AppDatabase): ContactoEmergenciaDao = db.contactoEmergenciaDao()
 
     @Provides
+    fun provideErrorLogDao(db: AppDatabase): ErrorLogDao = db.errorLogDao()
+
+    @Provides
     @Singleton
     fun provideSharedPreferences(@ApplicationContext context: Context): SharedPreferences {
         return context.getSharedPreferences("drivesmart_prefs", Context.MODE_PRIVATE)

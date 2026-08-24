@@ -22,12 +22,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.drivesmart.cx.data.local.entity.ServicioEntity
 import com.drivesmart.cx.ui.mobile.components.FullScreenImageDialog
 import com.drivesmart.cx.ui.viewmodel.DriveSmartViewModel
+import com.drivesmart.cx.util.DateTimeUtils
+import com.drivesmart.cx.util.FileHelper
 import com.drivesmart.cx.util.NumberFormatter
 import java.text.SimpleDateFormat
 import java.util.*
@@ -59,9 +62,9 @@ fun ServiciosScreen(viewModel: DriveSmartViewModel) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(padding),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(top = 16.dp, bottom = 80.dp, start = 16.dp, end = 16.dp)
         ) {
             if (servicios.isEmpty()) {
                 item {
@@ -193,15 +196,10 @@ fun AddServicioDialog(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         uri?.let {
-            try {
-                context.contentResolver.takePersistableUriPermission(
-                    it,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
-            } catch (e: Exception) {
-                e.printStackTrace()
+            val internalPath = FileHelper.copyFileToInternalStorage(context, it, "servicios")
+            if (internalPath != null) {
+                photoUri = internalPath
             }
-            photoUri = it.toString()
         }
     }
 
@@ -209,12 +207,12 @@ fun AddServicioDialog(
     var showProximaDatePicker by remember { mutableStateOf(false) }
 
     if (showUltimaDatePicker) {
-        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = ultimaFecha)
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = DateTimeUtils.localToUtc(ultimaFecha))
         DatePickerDialog(
             onDismissRequest = { showUltimaDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
-                    datePickerState.selectedDateMillis?.let { ultimaFecha = it }
+                    datePickerState.selectedDateMillis?.let { ultimaFecha = DateTimeUtils.utcToLocal(it) }
                     showUltimaDatePicker = false
                 }) { Text("OK") }
             }
@@ -222,12 +220,12 @@ fun AddServicioDialog(
     }
 
     if (showProximaDatePicker) {
-        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = proximaFecha)
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = DateTimeUtils.localToUtc(proximaFecha))
         DatePickerDialog(
             onDismissRequest = { showProximaDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
-                    datePickerState.selectedDateMillis?.let { proximaFecha = it }
+                    datePickerState.selectedDateMillis?.let { proximaFecha = DateTimeUtils.utcToLocal(it) }
                     showProximaDatePicker = false
                 }) { Text("OK") }
             }
@@ -261,7 +259,8 @@ fun AddServicioDialog(
                         value = nombre,
                         onValueChange = { nombre = it },
                         label = { Text(if (tipo == "Componente") "Nombre del Componente" else "Nombre del Servicio") },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words)
                     )
                 }
 
@@ -290,7 +289,8 @@ fun AddServicioDialog(
                             value = componentes,
                             onValueChange = { componentes = it },
                             label = { Text("Componentes (aceite, filtros, etc.)") },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
                         )
                     }
 

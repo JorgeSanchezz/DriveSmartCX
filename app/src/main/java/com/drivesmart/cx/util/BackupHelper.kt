@@ -15,45 +15,46 @@ object BackupHelper {
     }
 
     fun importFromJson(json: String): BackupData? {
-        return try {
-            gson.fromJson(json, BackupData::class.java)
-        } catch (e: Exception) {
-            null
-        }
+        return gson.fromJson(json, BackupData::class.java)
     }
 
     fun exportGastosToCsv(context: Context, uri: Uri, data: BackupData) {
-        context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-            val writer = CSVWriter(OutputStreamWriter(outputStream))
-            
-            // Header for Gastos
-            writer.writeNext(arrayOf("CATEGORIA", "MONTO", "LITROS", "FECHA", "NOTA"))
-            data.gastos.forEach { gasto ->
-                writer.writeNext(arrayOf(
-                    gasto.categoria,
-                    gasto.monto.toString(),
-                    gasto.litros?.toString() ?: "",
-                    gasto.fecha.toString(),
-                    gasto.nota ?: ""
-                ))
-            }
+        try {
+            context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                val writer = CSVWriter(OutputStreamWriter(outputStream))
+                
+                // Header for Gastos
+                writer.writeNext(arrayOf("CATEGORIA", "MONTO", "LITROS", "FECHA", "NOTA"))
+                data.gastos.forEach { gasto ->
+                    writer.writeNext(arrayOf(
+                        gasto.categoria,
+                        gasto.monto.toString(),
+                        gasto.litros?.toString() ?: "",
+                        gasto.fecha.toString(),
+                        gasto.nota ?: ""
+                    ))
+                }
 
-            // Separator
-            writer.writeNext(arrayOf(""))
-            
-            // Header for Servicios
-            writer.writeNext(arrayOf("TIPO", "NOMBRE", "ULTIMO_KM", "PROXIMO_KM", "ESTATUS"))
-            data.servicios.forEach { servicio ->
-                writer.writeNext(arrayOf(
-                    servicio.tipo,
-                    servicio.nombre,
-                    servicio.ultimoKilometraje.toString(),
-                    servicio.proximoKilometraje?.toString() ?: "",
-                    servicio.estatus
-                ))
+                // Separator
+                writer.writeNext(arrayOf(""))
+                
+                // Header for Servicios
+                writer.writeNext(arrayOf("TIPO", "NOMBRE", "ULTIMO_KM", "PROXIMO_KM", "ESTATUS"))
+                data.servicios.forEach { servicio ->
+                    writer.writeNext(arrayOf(
+                        servicio.tipo,
+                        servicio.nombre,
+                        servicio.ultimoKilometraje.toString(),
+                        servicio.proximoKilometraje?.toString() ?: "",
+                        servicio.estatus
+                    ))
+                }
+                
+                writer.close()
             }
-            
-            writer.close()
+        } catch (e: Exception) {
+            AppLogger.error("BackupHelper", "Error al exportar CSV", e)
+            throw e
         }
     }
 }

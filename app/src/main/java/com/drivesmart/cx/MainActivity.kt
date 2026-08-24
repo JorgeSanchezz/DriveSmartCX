@@ -51,11 +51,17 @@ class MainActivity : FragmentActivity() {
             val currentVehicle = vehicles!!.find { it.isSelected } ?: vehicles!!.firstOrNull()
             
             val primaryColor = if (appPrimaryColorHex != null) {
-                try { Color(android.graphics.Color.parseColor(appPrimaryColorHex)) } catch (e: Exception) { BrandPrimary }
+                try { Color(android.graphics.Color.parseColor(appPrimaryColorHex)) } catch (e: Exception) { 
+                    com.drivesmart.cx.util.AppLogger.error("MainActivity", "Error parsing app color", e)
+                    BrandPrimary 
+                }
             } else {
                 currentVehicle?.let { 
                     if (it.marca == "Otro" && it.customColorHex != null) {
-                        try { Color(android.graphics.Color.parseColor(it.customColorHex)) } catch (e: Exception) { VehicleBrand.OTRO.color }
+                        try { Color(android.graphics.Color.parseColor(it.customColorHex)) } catch (e: Exception) { 
+                            com.drivesmart.cx.util.AppLogger.error("MainActivity", "Error parsing vehicle color", e)
+                            VehicleBrand.OTRO.color 
+                        }
                     } else {
                         VehicleBrand.fromString(it.marca).color
                     }

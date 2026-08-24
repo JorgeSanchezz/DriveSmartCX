@@ -19,6 +19,7 @@ import com.drivesmart.cx.data.local.entity.ServicioEntity
 import com.drivesmart.cx.data.local.entity.TramiteEntity
 import com.drivesmart.cx.util.NumberFormatter
 import com.drivesmart.cx.util.VehicleBrand
+import androidx.compose.ui.text.font.FontWeight
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -37,6 +38,7 @@ fun DashboardScreen(
     onNavigateToInfoVehiculo: () -> Unit,
     onNavigateToGarage: () -> Unit,
     onNavigateToConfig: () -> Unit,
+    onNavigateToErrorLogs: () -> Unit,
     onEditVehicle: (Long) -> Unit
 ) {
     val vehicles by viewModel.allVehicles.collectAsState()
@@ -92,6 +94,9 @@ fun DashboardScreen(
                     IconButton(onClick = onNavigateToInfoVehiculo) {
                         Icon(Icons.Default.Info, contentDescription = "Información Vehículo")
                     }
+                    IconButton(onClick = onNavigateToErrorLogs) {
+                        Icon(Icons.Default.Warning, contentDescription = "Registro de Errores", tint = Color.Red)
+                    }
                     IconButton(onClick = onNavigateToConfig) {
                         Icon(Icons.Default.Settings, contentDescription = "Configuración")
                     }
@@ -125,6 +130,56 @@ fun DashboardScreen(
                             tint = brandColor,
                             modifier = Modifier.size(48.dp)
                         )
+                    }
+                }
+            }
+
+            // Banner de Alerta Prioritaria
+            if (alerts.isNotEmpty()) {
+                item {
+                    val priorityAlert = alerts.first()
+                    val isCritical = priorityAlert.contains("(CRÍTICO)")
+                    
+                    ElevatedCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.elevatedCardColors(
+                            containerColor = if (isCritical) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary
+                        ),
+                        onClick = {
+                            if (priorityAlert.contains("Servicio")) onNavigateToServicios()
+                            else if (priorityAlert.contains("Trámite") || priorityAlert.contains("Vence")) onNavigateToTramites()
+                        }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = if (isCritical) Icons.Default.Warning else Icons.Default.Notifications,
+                                contentDescription = null,
+                                tint = if (isCritical) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onTertiary,
+                                modifier = Modifier.size(32.dp)
+                            )
+                            Spacer(Modifier.width(16.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (isCritical) "ATENCIÓN REQUERIDA" else "RECORDATORIO",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = if (isCritical) MaterialTheme.colorScheme.onError.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onTertiary.copy(alpha = 0.8f)
+                                )
+                                Text(
+                                    text = priorityAlert,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isCritical) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onTertiary
+                                )
+                            }
+                            Icon(
+                                Icons.Default.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = if (isCritical) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onTertiary
+                            )
+                        }
                     }
                 }
             }

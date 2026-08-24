@@ -28,7 +28,8 @@ fun DriveSmartNavGraph(
         composable(Screen.Welcome.route) {
             WelcomeScreen(
                 viewModel = viewModel,
-                onNavigateToRegister = { navController.navigate(Screen.VehiculoForm.createRoute()) }
+                onNavigateToRegister = { navController.navigate(Screen.VehiculoForm.createRoute()) },
+                onNavigateToErrorLogs = { navController.navigate(Screen.ErrorLogs.route) }
             )
         }
         composable(Screen.Dashboard.route) {
@@ -45,6 +46,7 @@ fun DriveSmartNavGraph(
                 onNavigateToInfoVehiculo = { navController.navigate(Screen.InformacionVehiculo.route) },
                 onNavigateToGarage = { navController.navigate(Screen.Garage.route) },
                 onNavigateToConfig = { navController.navigate(Screen.Configuracion.route) },
+                onNavigateToErrorLogs = { navController.navigate(Screen.ErrorLogs.route) },
                 onEditVehicle = { id -> navController.navigate(Screen.VehiculoForm.createRoute(id)) }
             )
         }
@@ -105,6 +107,12 @@ fun DriveSmartNavGraph(
         }
         composable(Screen.Configuracion.route) {
             ConfiguracionScreen(viewModel)
+        }
+        composable(Screen.ErrorLogs.route) {
+            ErrorLogScreen(
+                viewModel = viewModel,
+                onBack = { navController.popBackStack() }
+            )
         }
     }
 }

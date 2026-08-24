@@ -5,6 +5,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -19,7 +20,8 @@ import com.drivesmart.cx.ui.viewmodel.DriveSmartViewModel
 @Composable
 fun WelcomeScreen(
     viewModel: DriveSmartViewModel,
-    onNavigateToRegister: () -> Unit
+    onNavigateToRegister: () -> Unit,
+    onNavigateToErrorLogs: () -> Unit
 ) {
     val context = LocalContext.current
     
@@ -29,46 +31,55 @@ fun WelcomeScreen(
         uri?.let { viewModel.importBackup(context, it) }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "Bienvenido a\nDriveSmartCX",
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-            lineHeight = 36.sp
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "Parece que aún no tienes vehículos registrados. Comencemos configurando tu primer vehículo o importa un respaldo existente.",
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.tertiary
-        )
-        Spacer(modifier = Modifier.height(48.dp))
-        
-        Button(
-            onClick = onNavigateToRegister,
-            modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.medium
+    Box(modifier = Modifier.fillMaxSize()) {
+        IconButton(
+            onClick = onNavigateToErrorLogs,
+            modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)
         ) {
-            Text("Registrar Mi Primer Vehículo")
+            Icon(Icons.Default.Warning, contentDescription = "Registro de Errores", tint = MaterialTheme.colorScheme.error)
         }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        OutlinedButton(
-            onClick = { importJsonLauncher.launch(arrayOf("application/json", "application/octet-stream")) },
-            modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.medium
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Importar Respaldo (JSON)")
+            Text(
+                text = "Bienvenido a\nDriveSmartCX",
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                lineHeight = 36.sp
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "Parece que aún no tienes vehículos registrados. Comencemos configurando tu primer vehículo o importa un respaldo existente.",
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.tertiary
+            )
+            Spacer(modifier = Modifier.height(48.dp))
+            
+            Button(
+                onClick = onNavigateToRegister,
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.medium
+            ) {
+                Text("Registrar Mi Primer Vehículo")
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            OutlinedButton(
+                onClick = { importJsonLauncher.launch(arrayOf("application/json", "application/octet-stream")) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.medium
+            ) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Importar Respaldo (JSON)")
+            }
         }
     }
 }

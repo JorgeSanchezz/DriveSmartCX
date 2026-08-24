@@ -33,6 +33,7 @@ object LocationHelper {
             
             bestLocation
         } catch (e: Exception) {
+            AppLogger.error("LocationHelper", "Error obteniendo ubicación", e)
             null
         }
     }

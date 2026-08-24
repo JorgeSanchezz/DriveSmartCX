@@ -58,9 +58,9 @@ fun EstacionamientoScreen(viewModel: DriveSmartViewModel) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(padding),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(top = 16.dp, bottom = 80.dp, start = 16.dp, end = 16.dp)
         ) {
             if (ubicaciones.isEmpty()) {
                 item {

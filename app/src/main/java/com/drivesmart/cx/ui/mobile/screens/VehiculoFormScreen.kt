@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.drivesmart.cx.ui.viewmodel.DriveSmartViewModel
@@ -137,7 +138,8 @@ fun VehiculoFormScreen(
                         value = customMarca,
                         onValueChange = { customMarca = it },
                         label = { Text("Nombre de la Marca") },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words)
                     )
                 }
                 item {
@@ -173,10 +175,10 @@ fun VehiculoFormScreen(
                 }
             }
 
-            item { OutlinedTextField(value = nombre, onValueChange = { nombre = it }, label = { Text("Nombre Personalizado (Ej: Mi Rayo)") }, modifier = Modifier.fillMaxWidth()) }
-            item { OutlinedTextField(value = placas, onValueChange = { placas = it }, label = { Text("Placas") }, modifier = Modifier.fillMaxWidth()) }
-            item { OutlinedTextField(value = vin, onValueChange = { vin = it }, label = { Text("Número de Serie (VIN)") }, modifier = Modifier.fillMaxWidth()) }
-            item { OutlinedTextField(value = modelo, onValueChange = { modelo = it }, label = { Text("Modelo / Versión") }, modifier = Modifier.fillMaxWidth()) }
+            item { OutlinedTextField(value = nombre, onValueChange = { nombre = it }, label = { Text("Nombre Personalizado (Ej: Mi Rayo)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)) }
+            item { OutlinedTextField(value = placas, onValueChange = { placas = it }, label = { Text("Placas") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters)) }
+            item { OutlinedTextField(value = vin, onValueChange = { vin = it }, label = { Text("Número de Serie (VIN)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters)) }
+            item { OutlinedTextField(value = modelo, onValueChange = { modelo = it }, label = { Text("Modelo / Versión") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words)) }
             item {
                 OutlinedTextField(
                     value = anio,

@@ -40,6 +40,11 @@ object NotificationHelper {
     }
 
     fun sendSOS(context: Context, contacts: List<ContactoEmergenciaEntity>, message: String) {
+        if (contacts.isEmpty()) {
+            android.widget.Toast.makeText(context, "No hay contactos SOS configurados", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+
         val loc = LocationHelper.getLastKnownLocation(context)
         val mapsUrl = if (loc != null) "\nUbicación: https://www.google.com/maps?q=${loc.latitude},${loc.longitude}" else "\n(Sin GPS disponible)"
         val fullMessage = "$message $mapsUrl"
@@ -48,28 +53,51 @@ object NotificationHelper {
 
         if (hasSmsPermission) {
             try {
-                val smsManager: SmsManager = context.getSystemService(SmsManager::class.java)
-                contacts.forEach { contact ->
-                    smsManager.sendTextMessage(contact.telefono, null, fullMessage, null, null)
+                val smsManager: SmsManager? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    context.applicationContext.getSystemService(SmsManager::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    SmsManager.getDefault()
                 }
-                android.widget.Toast.makeText(context, "SOS Enviado a ${contacts.size} contactos", android.widget.Toast.LENGTH_LONG).show()
+
+                if (smsManager != null) {
+                    contacts.forEach { contact ->
+                        val sanitizedPhone = contact.telefono.filter { it.isDigit() || it == '+' }
+                        val parts = smsManager.divideMessage(fullMessage)
+                        if (parts.size > 1) {
+                            smsManager.sendMultipartTextMessage(sanitizedPhone, null, parts, null, null)
+                        } else {
+                            smsManager.sendTextMessage(sanitizedPhone, null, fullMessage, null, null)
+                        }
+                    }
+                    android.widget.Toast.makeText(context, "SOS Enviado a ${contacts.size} contactos", android.widget.Toast.LENGTH_LONG).show()
+                } else {
+                    AppLogger.error("NotificationHelper", "SmsManager null, abriendo app de SMS")
+                    openSmsApp(context, contacts, fullMessage)
+                }
             } catch (e: Exception) {
-                // Si falla el envío directo por alguna razón técnica (no permisos)
+                AppLogger.error("NotificationHelper", "Error enviando SMS directo", e)
                 openSmsApp(context, contacts, fullMessage)
             }
         } else {
-            // Si no tiene permisos, simplemente abre la app de SMS sin mostrar error
+            AppLogger.error("NotificationHelper", "Sin permiso SEND_SMS, abriendo app de SMS")
             openSmsApp(context, contacts, fullMessage)
         }
     }
 
     private fun openSmsApp(context: Context, contacts: List<ContactoEmergenciaEntity>, fullMessage: String) {
         if (contacts.isNotEmpty()) {
-            val intent = Intent(Intent.ACTION_SENDTO).apply {
-                data = Uri.parse("smsto:${contacts.first().telefono}")
-                putExtra("sms_body", fullMessage)
+            try {
+                val intent = Intent(Intent.ACTION_SENDTO).apply {
+                    data = Uri.parse("smsto:${contacts.first().telefono}")
+                    putExtra("sms_body", fullMessage)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+            } catch (e: Exception) {
+                AppLogger.error("NotificationHelper", "Error al abrir app de mensajes", e)
+                android.widget.Toast.makeText(context, "Error al abrir app de mensajes", android.widget.Toast.LENGTH_SHORT).show()
             }
-            context.startActivity(intent)
         } else {
             android.widget.Toast.makeText(context, "No hay contactos configurados", android.widget.Toast.LENGTH_SHORT).show()
         }

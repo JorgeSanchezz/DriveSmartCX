@@ -6,15 +6,20 @@ import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.core.content.FileProvider
 import com.drivesmart.cx.data.local.entity.*
 import com.drivesmart.cx.domain.repository.DriveSmartRepository
 import com.drivesmart.cx.domain.repository.VehicleRepository
+import com.drivesmart.cx.util.AppLogger
 import com.drivesmart.cx.util.BackupHelper
 import com.drivesmart.cx.util.PdfHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
 import javax.inject.Inject
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -22,7 +27,8 @@ import javax.inject.Inject
 class DriveSmartViewModel @Inject constructor(
     private val vehicleRepository: VehicleRepository,
     private val driveSmartRepository: DriveSmartRepository,
-    private val sharedPreferences: SharedPreferences
+    private val sharedPreferences: SharedPreferences,
+    private val logger: AppLogger
 ) : ViewModel() {
 
     private val _isBiometricEnabled = MutableStateFlow(sharedPreferences.getBoolean("biometric_enabled", false))
@@ -145,12 +151,37 @@ class DriveSmartViewModel @Inject constructor(
         (static + otherCategories).distinct()
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val errorLogs: StateFlow<List<ErrorLogEntity>> = driveSmartRepository.getAllErrorLogs()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun removeErrorLog(log: ErrorLogEntity) {
+        viewModelScope.launch {
+            driveSmartRepository.deleteErrorLog(log)
+        }
+    }
+
+    fun clearAllErrorLogs() {
+        viewModelScope.launch {
+            driveSmartRepository.clearAllErrorLogs()
+        }
+    }
+
     fun exportBackup(context: Context, uri: Uri) {
         viewModelScope.launch {
-            val data = driveSmartRepository.getAllData()
-            val json = BackupHelper.exportToJson(data)
-            context.contentResolver.openOutputStream(uri)?.use { 
-                it.write(json.toByteArray())
+            try {
+                val data = driveSmartRepository.getAllData()
+                val json = BackupHelper.exportToJson(data)
+                context.contentResolver.openOutputStream(uri)?.use { 
+                    it.write(json.toByteArray())
+                }
+                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    android.widget.Toast.makeText(context, "Copia de seguridad guardada", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                logger.e("DriveSmartVM", "Error al exportar JSON", e)
+                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    android.widget.Toast.makeText(context, "Error al exportar: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
+                }
             }
         }
     }
@@ -164,35 +195,87 @@ class DriveSmartViewModel @Inject constructor(
                     if (data != null && data.vehicles.isNotEmpty()) {
                         driveSmartRepository.restoreAllData(data)
                         
-                        // IMPORTANTE: Resetear el ID del vehículo seleccionado tras la importación
-                        // para que la UI no se quede buscando un ID viejo.
+                        // Resetear el ID del vehículo seleccionado tras la importación
                         val newSelectedId = data.vehicles.find { it.isSelected }?.id ?: data.vehicles.first().id
                         selectVehicle(newSelectedId)
                         
-                        Log.d("DriveSmartVM", "Importación exitosa. Vehículo seleccionado: $newSelectedId")
+                        withContext(kotlinx.coroutines.Dispatchers.Main) {
+                            android.widget.Toast.makeText(context, "Respaldo importado con éxito", android.widget.Toast.LENGTH_LONG).show()
+                        }
                     } else if (data != null && data.vehicles.isEmpty()) {
-                        Log.w("DriveSmartVM", "El respaldo no contiene vehículos.")
+                        val errorMsg = "El respaldo no contiene vehículos válidos"
+                        logger.e("DriveSmartVM", errorMsg)
+                        withContext(kotlinx.coroutines.Dispatchers.Main) {
+                            android.widget.Toast.makeText(context, errorMsg, android.widget.Toast.LENGTH_LONG).show()
+                        }
                     } else {
-                        Log.e("DriveSmartVM", "Error: El JSON de respaldo no es válido.")
+                        val errorMsg = "El archivo no tiene un formato de respaldo válido"
+                        logger.e("DriveSmartVM", errorMsg)
+                        withContext(kotlinx.coroutines.Dispatchers.Main) {
+                            android.widget.Toast.makeText(context, errorMsg, android.widget.Toast.LENGTH_LONG).show()
+                        }
                     }
+                } else {
+                    logger.e("DriveSmartVM", "No se pudo leer el contenido del archivo")
                 }
             } catch (e: Exception) {
-                Log.e("DriveSmartVM", "Error al importar respaldo", e)
+                logger.e("DriveSmartVM", "Fallo crítico al importar el archivo", e)
+                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    android.widget.Toast.makeText(context, "Error al procesar el archivo: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
+                }
             }
         }
     }
 
     fun exportCsv(context: Context, uri: Uri) {
         viewModelScope.launch {
-            val data = driveSmartRepository.getAllData()
-            BackupHelper.exportGastosToCsv(context, uri, data)
+            try {
+                val data = driveSmartRepository.getAllData()
+                BackupHelper.exportGastosToCsv(context, uri, data)
+                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    android.widget.Toast.makeText(context, "Archivo CSV guardado", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                logger.e("DriveSmartVM", "Error al exportar CSV", e)
+                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    android.widget.Toast.makeText(context, "Error al exportar CSV: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
+                }
+            }
         }
     }
 
-    fun exportPdf(context: Context, uri: Uri) {
+    fun exportPdf(context: Context, vehicleId: Long? = null, onResult: (Uri?) -> Unit) {
         viewModelScope.launch {
             val data = driveSmartRepository.getAllData()
-            PdfHelper.generateMaintenanceReport(context, uri, data)
+            val vehicle = if (vehicleId != null) data.vehicles.find { it.id == vehicleId } else null
+            
+            try {
+                val reportsDir = File(context.cacheDir, "reports")
+                if (!reportsDir.exists()) reportsDir.mkdirs()
+                
+                // Limpiar reportes viejos
+                reportsDir.listFiles()?.forEach { it.delete() }
+                
+                val fileName = "Reporte_${if (vehicle != null) vehicle.nombre.replace(" ", "_") else "General"}.pdf"
+                val file = File(reportsDir, fileName)
+                
+                FileOutputStream(file).use { out ->
+                    PdfHelper.generateMaintenanceReport(context, out, data, vehicle)
+                }
+                
+                val uri = FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    file
+                )
+                onResult(uri)
+            } catch (e: Exception) {
+                logger.e("DriveSmartVM", "Error al generar PDF", e)
+                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    android.widget.Toast.makeText(context, "Error al generar reporte: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
+                }
+                onResult(null)
+            }
         }
     }
 

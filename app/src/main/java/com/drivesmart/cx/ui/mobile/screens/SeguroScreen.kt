@@ -7,6 +7,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -16,11 +17,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.drivesmart.cx.data.local.entity.SeguroEntity
 import com.drivesmart.cx.ui.mobile.components.FullScreenImageDialog
 import com.drivesmart.cx.ui.viewmodel.DriveSmartViewModel
+import com.drivesmart.cx.util.DateTimeUtils
+import com.drivesmart.cx.util.FileHelper
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -93,15 +97,10 @@ fun SeguroDetail(seguro: SeguroEntity, modifier: Modifier = Modifier, onUpdate: 
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         uri?.let {
-            try {
-                context.contentResolver.takePersistableUriPermission(
-                    it,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
-            } catch (e: Exception) {
-                e.printStackTrace()
+            val internalPath = FileHelper.copyFileToInternalStorage(context, it, "seguros")
+            if (internalPath != null) {
+                onUpdate(seguro.copy(documentUri = internalPath))
             }
-            onUpdate(seguro.copy(documentUri = it.toString()))
         }
     }
 
@@ -167,16 +166,34 @@ fun SeguroDetail(seguro: SeguroEntity, modifier: Modifier = Modifier, onUpdate: 
                         modifier = Modifier.padding(16.dp).fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        if (seguro.documentUri.contains("image")) {
+                        val isImage = remember(seguro.documentUri) {
+                            try {
+                                context.contentResolver.getType(Uri.parse(seguro.documentUri))?.contains("image") == true || 
+                                seguro.documentUri.contains("image", ignoreCase = true)
+                            } catch (e: Exception) {
+                                seguro.documentUri.contains("image", ignoreCase = true)
+                            }
+                        }
+
+                        if (isImage) {
                             AsyncImage(
                                 model = seguro.documentUri,
                                 contentDescription = null,
                                 modifier = Modifier.fillMaxWidth().height(200.dp).clickable {
-                                    val intent = Intent(Intent.ACTION_VIEW).apply {
-                                        setDataAndType(Uri.parse(seguro.documentUri), "image/*")
-                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    val uri = if (seguro.documentUri.startsWith("/")) {
+                                        FileHelper.getShareableUri(context, seguro.documentUri)
+                                    } else {
+                                        Uri.parse(seguro.documentUri)
                                     }
-                                    context.startActivity(intent)
+
+                                    if (uri != null) {
+                                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                                            val mimeType = context.contentResolver.getType(uri) ?: "image/*"
+                                            setDataAndType(uri, mimeType)
+                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                        }
+                                        try { context.startActivity(intent) } catch (e: Exception) { }
+                                    }
                                 },
                                 contentScale = ContentScale.Fit
                             )
@@ -185,14 +202,24 @@ fun SeguroDetail(seguro: SeguroEntity, modifier: Modifier = Modifier, onUpdate: 
                             Text("Documento Guardado", style = MaterialTheme.typography.bodyMedium)
                             Spacer(Modifier.height(8.dp))
                             Button(onClick = {
-                                val intent = Intent(Intent.ACTION_VIEW).apply {
-                                    setDataAndType(Uri.parse(seguro.documentUri), "application/pdf")
-                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                val uri = if (seguro.documentUri.startsWith("/")) {
+                                    FileHelper.getShareableUri(context, seguro.documentUri)
+                                } else {
+                                    Uri.parse(seguro.documentUri)
                                 }
-                                try {
-                                    context.startActivity(intent)
-                                } catch (e: Exception) {
-                                    // Manejar si no hay app para PDF
+
+                                if (uri != null) {
+                                    val mimeType = context.contentResolver.getType(uri) ?: "application/pdf"
+                                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                                        setDataAndType(uri, mimeType)
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                    try { 
+                                        context.startActivity(intent) 
+                                    } catch (e: Exception) {
+                                        com.drivesmart.cx.util.AppLogger.error("SeguroScreen", "No se pudo abrir el visor", e)
+                                        android.widget.Toast.makeText(context, "No se pudo abrir el archivo", android.widget.Toast.LENGTH_SHORT).show()
+                                    }
                                 }
                             }) {
                                 Text("Ver Documento")
@@ -252,15 +279,10 @@ fun SeguroForm(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         uri?.let {
-            try {
-                context.contentResolver.takePersistableUriPermission(
-                    it,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
-            } catch (e: Exception) {
-                e.printStackTrace()
+            val internalPath = FileHelper.copyFileToInternalStorage(context, it, "seguros")
+            if (internalPath != null) {
+                documentUri = internalPath
             }
-            documentUri = it.toString()
         }
     }
     
@@ -270,12 +292,12 @@ fun SeguroForm(
     var showDatePicker by remember { mutableStateOf(false) }
 
     if (showDatePicker) {
-        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = vencimiento)
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = DateTimeUtils.localToUtc(vencimiento))
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
-                    datePickerState.selectedDateMillis?.let { vencimiento = it }
+                    datePickerState.selectedDateMillis?.let { vencimiento = DateTimeUtils.utcToLocal(it) }
                     showDatePicker = false
                 }) { Text("OK") }
             }
@@ -286,10 +308,10 @@ fun SeguroForm(
         modifier = modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item { OutlinedTextField(value = aseguradora, onValueChange = { aseguradora = it }, label = { Text("Aseguradora") }, modifier = Modifier.fillMaxWidth()) }
-        item { OutlinedTextField(value = poliza, onValueChange = { poliza = it }, label = { Text("Número de Póliza") }, modifier = Modifier.fillMaxWidth()) }
+        item { OutlinedTextField(value = aseguradora, onValueChange = { aseguradora = it }, label = { Text("Aseguradora") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words)) }
+        item { OutlinedTextField(value = poliza, onValueChange = { poliza = it }, label = { Text("Número de Póliza") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters)) }
         item { OutlinedTextField(value = tel, onValueChange = { tel = it }, label = { Text("Teléfono de Siniestros") }, modifier = Modifier.fillMaxWidth()) }
-        item { OutlinedTextField(value = cobertura, onValueChange = { cobertura = it }, label = { Text("Tipo de Cobertura") }, modifier = Modifier.fillMaxWidth()) }
+        item { OutlinedTextField(value = cobertura, onValueChange = { cobertura = it }, label = { Text("Tipo de Cobertura") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)) }
         
         item {
             OutlinedTextField(
@@ -306,7 +328,7 @@ fun SeguroForm(
             )
         }
 
-        item { OutlinedTextField(value = notas, onValueChange = { notas = it }, label = { Text("Notas") }, modifier = Modifier.fillMaxWidth(), minLines = 3) }
+        item { OutlinedTextField(value = notas, onValueChange = { notas = it }, label = { Text("Notas") }, modifier = Modifier.fillMaxWidth(), minLines = 3, keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)) }
 
         item {
             if (documentUri != null) {
@@ -315,7 +337,16 @@ fun SeguroForm(
                         modifier = Modifier.padding(12.dp).fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        if (documentUri!!.contains("image")) {
+                        val isImage = remember(documentUri) {
+                            try {
+                                context.contentResolver.getType(Uri.parse(documentUri))?.contains("image") == true || 
+                                documentUri!!.contains("image", ignoreCase = true)
+                            } catch (e: Exception) {
+                                documentUri!!.contains("image", ignoreCase = true)
+                            }
+                        }
+
+                        if (isImage) {
                             AsyncImage(
                                 model = documentUri,
                                 contentDescription = null,
@@ -331,11 +362,25 @@ fun SeguroForm(
                             Spacer(Modifier.height(8.dp))
                             Button(
                                 onClick = {
-                                    val intent = Intent(Intent.ACTION_VIEW).apply {
-                                        setDataAndType(Uri.parse(documentUri), "application/pdf")
-                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    val uri = if (documentUri!!.startsWith("/")) {
+                                        FileHelper.getShareableUri(context, documentUri!!)
+                                    } else {
+                                        Uri.parse(documentUri)
                                     }
-                                    try { context.startActivity(intent) } catch (e: Exception) { }
+                                    
+                                    if (uri != null) {
+                                        val mimeType = context.contentResolver.getType(uri) ?: "application/pdf"
+                                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                                            setDataAndType(uri, mimeType)
+                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                        }
+                                        try { 
+                                            context.startActivity(intent) 
+                                        } catch (e: Exception) {
+                                            com.drivesmart.cx.util.AppLogger.error("SeguroScreen", "No se pudo abrir el visor", e)
+                                            android.widget.Toast.makeText(context, "No se pudo abrir el archivo", android.widget.Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
                                 }
                             ) {
                                 Text("Ver PDF")

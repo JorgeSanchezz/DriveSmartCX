@@ -13,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.drivesmart.cx.data.local.entity.PreventivoEntity
@@ -39,8 +40,9 @@ fun PreventivosScreen(viewModel: DriveSmartViewModel) {
         }
     ) { padding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.fillMaxSize().padding(padding),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(top = 16.dp, bottom = 80.dp, start = 16.dp, end = 16.dp)
         ) {
             if (preventivos.isEmpty()) {
                 item { Text("No hay Revision programada. Añade una para empezar.") }
@@ -123,7 +125,7 @@ fun AddPreventivoDialog(item: PreventivoEntity? = null, onDismiss: () -> Unit, o
         title = { Text(if (item == null) "Nueva Revision" else "Editar Revision") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(value = nombre, onValueChange = { nombre = it }, label = { Text("¿Qué revisar? (Ej: Llantas)") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = nombre, onValueChange = { nombre = it }, label = { Text("¿Qué revisar? (Ej: Llantas)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences))
                 OutlinedTextField(
                     value = dias, 
                     onValueChange = { dias = it }, 
@@ -136,7 +138,8 @@ fun AddPreventivoDialog(item: PreventivoEntity? = null, onDismiss: () -> Unit, o
                     onValueChange = { notas = it },
                     label = { Text("Notas / Observaciones") },
                     modifier = Modifier.fillMaxWidth(),
-                    minLines = 2
+                    minLines = 2,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
                 )
             }
         },

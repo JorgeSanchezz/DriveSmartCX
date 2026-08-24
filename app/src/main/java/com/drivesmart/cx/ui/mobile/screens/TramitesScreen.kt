@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -21,11 +22,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.drivesmart.cx.data.local.entity.TramiteEntity
 import com.drivesmart.cx.ui.mobile.components.FullScreenImageDialog
 import com.drivesmart.cx.ui.viewmodel.DriveSmartViewModel
+import com.drivesmart.cx.util.DateTimeUtils
+import com.drivesmart.cx.util.FileHelper
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -56,9 +60,9 @@ fun TramitesScreen(viewModel: DriveSmartViewModel) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(padding),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(top = 16.dp, bottom = 80.dp, start = 16.dp, end = 16.dp)
         ) {
             if (tramites.isEmpty()) {
                 item {
@@ -153,25 +157,20 @@ fun AddTramiteDialog(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         uri?.let {
-            try {
-                context.contentResolver.takePersistableUriPermission(
-                    it,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
-            } catch (e: Exception) {
-                e.printStackTrace()
+            val internalPath = FileHelper.copyFileToInternalStorage(context, it, "tramites")
+            if (internalPath != null) {
+                photoUri = internalPath
             }
-            photoUri = it.toString()
         }
     }
 
     if (showDatePicker) {
-        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = fechaVencimiento)
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = DateTimeUtils.localToUtc(fechaVencimiento))
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
-                    datePickerState.selectedDateMillis?.let { fechaVencimiento = it }
+                    datePickerState.selectedDateMillis?.let { fechaVencimiento = DateTimeUtils.utcToLocal(it) }
                     showDatePicker = false
                 }) { Text("OK") }
             },
@@ -188,7 +187,13 @@ fun AddTramiteDialog(
         title = { Text(if (tramite == null) "Nuevo Trámite" else "Editar Trámite") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(value = nombre, onValueChange = { nombre = it }, label = { Text("Nombre del Trámite") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(
+                    value = nombre,
+                    onValueChange = { nombre = it },
+                    label = { Text("Nombre del Trámite") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words)
+                )
                 
                 Text("Estatus", style = MaterialTheme.typography.labelLarge)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -214,7 +219,13 @@ fun AddTramiteDialog(
                     }
                 )
 
-                OutlinedTextField(value = descripcion, onValueChange = { descripcion = it }, label = { Text("Descripción / Nota") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(
+                    value = descripcion,
+                    onValueChange = { descripcion = it },
+                    label = { Text("Descripción / Nota") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
+                )
 
                 Text("Evidencia / Foto", style = MaterialTheme.typography.labelLarge)
                 if (photoUri != null) {

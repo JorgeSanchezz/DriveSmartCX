@@ -7,6 +7,7 @@ import com.drivesmart.cx.data.local.dao.*
 import com.drivesmart.cx.data.local.entity.*
 import com.drivesmart.cx.domain.repository.DriveSmartRepository
 import com.drivesmart.cx.domain.repository.BackupData
+import com.drivesmart.cx.util.AppLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -23,8 +24,14 @@ class DriveSmartRepositoryImpl @Inject constructor(
     private val ubicacionDao: UbicacionDao,
     private val seguroDao: SeguroDao,
     private val preventivoDao: PreventivoDao,
-    private val sosDao: ContactoEmergenciaDao
+    private val sosDao: ContactoEmergenciaDao,
+    private val errorLogDao: ErrorLogDao
 ) : DriveSmartRepository {
+
+    override fun getAllErrorLogs() = errorLogDao.getAllLogs()
+    override suspend fun logError(log: ErrorLogEntity) = errorLogDao.insertLog(log)
+    override suspend fun deleteErrorLog(log: ErrorLogEntity) = errorLogDao.deleteLog(log)
+    override suspend fun clearAllErrorLogs() = errorLogDao.deleteAllLogs()
 
     override fun getGastos(vehiculoId: Long) = gastoDao.getGastosByVehiculo(vehiculoId)
     override suspend fun addGasto(gasto: GastoEntity) = gastoDao.insertGasto(gasto)
@@ -80,53 +87,58 @@ class DriveSmartRepositoryImpl @Inject constructor(
 
     override suspend fun restoreAllData(data: BackupData): Unit {
         withContext(Dispatchers.IO) {
-            database.withTransaction {
-                Log.d("DriveSmartRepo", "Iniciando restauración de datos...")
+            try {
+                database.withTransaction {
+                    Log.d("DriveSmartRepo", "Iniciando restauración de datos...")
 
-                // 1. Limpiar todo
-                vehiculoDao.clearVehiculos()
-                gastoDao.clearGastos()
-                servicioDao.clearServicios()
-                tramiteDao.clearTramites()
-                bitacoraDao.clearBitacora()
-                contactoDao.clearContactos()
-                ubicacionDao.clearUbicaciones()
-                seguroDao.clearSeguros()
-                preventivoDao.clearPreventivos()
-                sosDao.clearSOSContacts()
+                    // 1. Limpiar todo
+                    vehiculoDao.clearVehiculos()
+                    gastoDao.clearGastos()
+                    servicioDao.clearServicios()
+                    tramiteDao.clearTramites()
+                    bitacoraDao.clearBitacora()
+                    contactoDao.clearContactos()
+                    ubicacionDao.clearUbicaciones()
+                    seguroDao.clearSeguros()
+                    preventivoDao.clearPreventivos()
+                    sosDao.clearSOSContacts()
 
-                // 2. Restaurar en orden (Vehículos primero por llaves foráneas)
-                vehiculoDao.insertVehiculos(data.vehicles)
-                Log.d("DriveSmartRepo", "Vehículos restaurados: ${data.vehicles.size}")
+                    // 2. Restaurar en orden (Vehículos primero por llaves foráneas)
+                    vehiculoDao.insertVehiculos(data.vehicles)
+                    Log.d("DriveSmartRepo", "Vehículos restaurados: ${data.vehicles.size}")
 
-                gastoDao.insertGastos(data.gastos)
-                Log.d("DriveSmartRepo", "Gastos restaurados: ${data.gastos.size}")
+                    gastoDao.insertGastos(data.gastos)
+                    Log.d("DriveSmartRepo", "Gastos restaurados: ${data.gastos.size}")
 
-                servicioDao.insertServicios(data.servicios)
-                Log.d("DriveSmartRepo", "Servicios restaurados: ${data.servicios.size}")
+                    servicioDao.insertServicios(data.servicios)
+                    Log.d("DriveSmartRepo", "Servicios restaurados: ${data.servicios.size}")
 
-                tramiteDao.insertTramites(data.tramites)
-                Log.d("DriveSmartRepo", "Trámites restaurados: ${data.tramites.size}")
+                    tramiteDao.insertTramites(data.tramites)
+                    Log.d("DriveSmartRepo", "Trámites restaurados: ${data.tramites.size}")
 
-                bitacoraDao.insertBitacora(data.bitacora)
-                Log.d("DriveSmartRepo", "Bitácora restaurada: ${data.bitacora.size}")
+                    bitacoraDao.insertBitacora(data.bitacora)
+                    Log.d("DriveSmartRepo", "Bitácora restaurada: ${data.bitacora.size}")
 
-                contactoDao.insertContactos(data.contactos)
-                Log.d("DriveSmartRepo", "Contactos restaurados: ${data.contactos.size}")
+                    contactoDao.insertContactos(data.contactos)
+                    Log.d("DriveSmartRepo", "Contactos restaurados: ${data.contactos.size}")
 
-                ubicacionDao.insertUbicaciones(data.ubicaciones)
-                Log.d("DriveSmartRepo", "Ubicaciones restauradas: ${data.ubicaciones.size}")
+                    ubicacionDao.insertUbicaciones(data.ubicaciones)
+                    Log.d("DriveSmartRepo", "Ubicaciones restauradas: ${data.ubicaciones.size}")
 
-                seguroDao.insertSeguros(data.seguros)
-                Log.d("DriveSmartRepo", "Seguros restaurados: ${data.seguros.size}")
+                    seguroDao.insertSeguros(data.seguros)
+                    Log.d("DriveSmartRepo", "Seguros restaurados: ${data.seguros.size}")
 
-                preventivoDao.insertPreventivos(data.preventivos)
-                Log.d("DriveSmartRepo", "Mantenimientos restaurados: ${data.preventivos.size}")
+                    preventivoDao.insertPreventivos(data.preventivos)
+                    Log.d("DriveSmartRepo", "Mantenimientos restaurados: ${data.preventivos.size}")
 
-                data.sosContacts.forEach { sosDao.insertSOSContact(it) }
-                Log.d("DriveSmartRepo", "Contactos SOS restaurados: ${data.sosContacts.size}")
+                    data.sosContacts.forEach { sosDao.insertSOSContact(it) }
+                    Log.d("DriveSmartRepo", "Contactos SOS restaurados: ${data.sosContacts.size}")
 
-                Log.d("DriveSmartRepo", "Restauración completada con éxito.")
+                    Log.d("DriveSmartRepo", "Restauración completada con éxito.")
+                }
+            } catch (e: Exception) {
+                AppLogger.error("DriveSmartRepo", "Error crítico al restaurar datos", e)
+                throw e
             }
         }
     }
