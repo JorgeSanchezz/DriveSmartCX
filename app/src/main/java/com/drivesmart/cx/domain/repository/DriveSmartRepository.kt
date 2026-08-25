@@ -3,6 +3,8 @@ package com.drivesmart.cx.domain.repository
 import com.drivesmart.cx.data.local.entity.*
 import kotlinx.coroutines.flow.Flow
 
+import androidx.annotation.Keep
+
 interface DriveSmartRepository {
     // Error Logs
     fun getAllErrorLogs(): Flow<List<ErrorLogEntity>>
@@ -59,6 +61,7 @@ interface DriveSmartRepository {
     suspend fun restoreAllData(data: BackupData)
 }
 
+@Keep
 data class BackupData(
     val vehicles: List<VehiculoEntity> = emptyList(),
     val gastos: List<GastoEntity> = emptyList(),

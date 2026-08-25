@@ -1,8 +1,10 @@
 package com.drivesmart.cx.data.local.entity
 
+import androidx.annotation.Keep
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
+@Keep
 @Entity(tableName = "vehiculos")
 data class VehiculoEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,

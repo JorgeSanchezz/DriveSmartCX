@@ -10,3 +10,14 @@
 #-keepclassmembers class fqcn.of.javascript.interface.for.webview {
 #   public *;
 #}
+
+# Mantener modelos de datos para serialización con Gson
+-keepclassmembers class com.drivesmart.cx.domain.repository.BackupData { <fields>; }
+-keepclassmembers class com.drivesmart.cx.data.local.entity.** { <fields>; }
+-keep class com.drivesmart.cx.domain.repository.BackupData { *; }
+-keep class com.drivesmart.cx.data.local.entity.** { *; }
+
+# Reglas generales para Gson
+-keepattributes Signature, *Annotation*, EnclosingMethod
+-keepclassmembers enum * { *; }
+-keep class com.google.gson.** { *; }

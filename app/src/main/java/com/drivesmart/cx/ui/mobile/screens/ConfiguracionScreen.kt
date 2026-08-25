@@ -223,7 +223,7 @@ fun ConfiguracionScreen(viewModel: DriveSmartViewModel) {
             item {
                 Spacer(modifier = Modifier.height(24.dp))
                 Text(
-                    text = "DriveSmartCX v1.4",
+                    text = "DriveSmartCX v1.6",
                     modifier = Modifier.fillMaxWidth(),
                     textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.labelSmall,

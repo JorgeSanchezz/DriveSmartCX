@@ -192,7 +192,8 @@ class DriveSmartViewModel @Inject constructor(
                 val json = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
                 if (json != null) {
                     val data = BackupHelper.importFromJson(json)
-                    if (data != null && data.vehicles.isNotEmpty()) {
+                    // Verificación extra de nulidad para campos internos por si falla ProGuard
+                    if (data != null && data.vehicles != null && data.vehicles.isNotEmpty()) {
                         driveSmartRepository.restoreAllData(data)
                         
                         // Resetear el ID del vehículo seleccionado tras la importación
@@ -202,8 +203,8 @@ class DriveSmartViewModel @Inject constructor(
                         withContext(kotlinx.coroutines.Dispatchers.Main) {
                             android.widget.Toast.makeText(context, "Respaldo importado con éxito", android.widget.Toast.LENGTH_LONG).show()
                         }
-                    } else if (data != null && data.vehicles.isEmpty()) {
-                        val errorMsg = "El respaldo no contiene vehículos válidos"
+                    } else if (data != null && (data.vehicles == null || data.vehicles.isEmpty())) {
+                        val errorMsg = "El respaldo no contiene vehículos válidos o el archivo está corrupto"
                         logger.e("DriveSmartVM", errorMsg)
                         withContext(kotlinx.coroutines.Dispatchers.Main) {
                             android.widget.Toast.makeText(context, errorMsg, android.widget.Toast.LENGTH_LONG).show()
