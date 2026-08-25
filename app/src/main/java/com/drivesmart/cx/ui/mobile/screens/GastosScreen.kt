@@ -9,13 +9,17 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -133,6 +137,10 @@ fun GastosScreen(viewModel: DriveSmartViewModel) {
                 }
             }
 
+            if (filteredGastos.isNotEmpty()) {
+                GastosChartCard(gastos = filteredGastos)
+            }
+
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -189,6 +197,47 @@ fun GastosScreen(viewModel: DriveSmartViewModel) {
 }
 
 @Composable
+fun GastosChartCard(gastos: List<GastoEntity>) {
+    val total = gastos.sumOf { it.monto }
+    val categoryTotals = gastos.groupBy { it.categoria }
+        .mapValues { it.value.sumOf { g -> g.monto } }
+        .toList()
+        .sortedByDescending { it.second }
+
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text("Distribución", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                categoryTotals.take(4).forEach { (category, amount) ->
+                    val percentage = if (total > 0) (amount / total).toFloat() else 0f
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(category, style = MaterialTheme.typography.bodySmall, maxLines = 1, modifier = Modifier.weight(1f))
+                            Text("$${String.format(Locale.getDefault(), "%.0f", amount)} (${(percentage * 100).toInt()}%)", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                        }
+                        LinearProgressIndicator(
+                            progress = { percentage },
+                            modifier = Modifier.fillMaxWidth().height(4.dp).clip(CircleShape),
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun GastoItem(gasto: GastoEntity, sdf: SimpleDateFormat, onEdit: () -> Unit, onDelete: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -199,7 +248,7 @@ fun GastoItem(gasto: GastoEntity, sdf: SimpleDateFormat, onEdit: () -> Unit, onD
                 AsyncImage(
                     model = gasto.photoUri,
                     contentDescription = null,
-                    modifier = Modifier.size(60.dp).padding(4.dp).align(Alignment.Top),
+                    modifier = Modifier.size(60.dp).padding(4.dp).align(Alignment.Top).clip(MaterialTheme.shapes.small),
                     contentScale = ContentScale.Crop
                 )
             }
@@ -207,13 +256,15 @@ fun GastoItem(gasto: GastoEntity, sdf: SimpleDateFormat, onEdit: () -> Unit, onD
             Column(modifier = Modifier.weight(1f).padding(8.dp)) {
                 Text(gasto.categoria, style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "${sdf.format(Date(gasto.fecha))}${if (gasto.litros != null) " - ${gasto.litros} L" else ""} - ${gasto.nota ?: ""}",
-                    style = MaterialTheme.typography.bodySmall
+                    "${sdf.format(Date(gasto.fecha))}${if (gasto.litros != null) " - ${gasto.litros} L" else ""} ${if (!gasto.nota.isNullOrBlank()) " - ${gasto.nota}" else ""}",
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 2
                 )
                 Text(
                     "$${gasto.monto}",
                     style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
                 )
             }
             IconButton(onClick = onEdit) {
@@ -312,124 +363,114 @@ fun AddGastoDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (gasto == null) "Nuevo Gasto" else "Editar Gasto") },
         text = {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                item {
-                    Text("Categoría", style = MaterialTheme.typography.labelLarge)
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        availableCategories.forEach { cat ->
-                            FilterChip(
-                                selected = categoria == cat,
-                                onClick = { categoria = cat },
-                                label = { Text(cat) }
-                            )
-                        }
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text("Categoría", style = MaterialTheme.typography.labelLarge)
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    availableCategories.forEach { cat ->
+                        FilterChip(
+                            selected = categoria == cat,
+                            onClick = { categoria = cat },
+                            label = { Text(cat) }
+                        )
                     }
                 }
                 
-                item {
-                    OutlinedTextField(
-                        value = categoria,
-                        onValueChange = { categoria = it },
-                        label = { Text("Otra categoría...") },
-                        modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words)
-                    )
-                }
+                OutlinedTextField(
+                    value = categoria,
+                    onValueChange = { categoria = it },
+                    label = { Text("Otra categoría...") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words)
+                )
 
-                item {
+                OutlinedTextField(
+                    value = monto,
+                    onValueChange = { monto = it },
+                    label = { Text("Monto ($)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                )
+
+                OutlinedTextField(
+                    value = sdf.format(Date(fecha)),
+                    onValueChange = { },
+                    label = { Text("Fecha y Hora") },
+                    modifier = Modifier.fillMaxWidth(),
+                    readOnly = true,
+                    trailingIcon = {
+                        Row {
+                            IconButton(onClick = { showDatePicker = true }) {
+                                Icon(Icons.Default.DateRange, contentDescription = "Cambiar Fecha")
+                            }
+                            IconButton(onClick = { showTimePicker = true }) {
+                                Icon(Icons.Default.Build, contentDescription = "Cambiar Hora")
+                            }
+                        }
+                    }
+                )
+
+                if (categoria == "Gasolina") {
                     OutlinedTextField(
-                        value = monto,
-                        onValueChange = { monto = it },
-                        label = { Text("Monto ($)") },
+                        value = litros,
+                        onValueChange = { litros = it },
+                        label = { Text("Litros") },
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                     )
                 }
 
-                item {
-                    OutlinedTextField(
-                        value = sdf.format(Date(fecha)),
-                        onValueChange = { },
-                        label = { Text("Fecha y Hora") },
-                        modifier = Modifier.fillMaxWidth(),
-                        readOnly = true,
-                        trailingIcon = {
-                            Row {
-                                IconButton(onClick = { showDatePicker = true }) {
-                                    Icon(Icons.Default.DateRange, contentDescription = "Cambiar Fecha")
-                                }
-                                IconButton(onClick = { showTimePicker = true }) {
-                                    Icon(Icons.Default.Build, contentDescription = "Cambiar Hora") // Usamos Build como placeholder para reloj
-                                }
-                            }
-                        }
-                    )
-                }
+                OutlinedTextField(
+                    value = nota,
+                    onValueChange = { nota = it },
+                    label = { Text(if (categoria == "Refacciones") "Descripción de la refacción" else "Nota") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
+                )
 
-                if (categoria == "Gasolina") {
-                    item {
-                        OutlinedTextField(
-                            value = litros,
-                            onValueChange = { litros = it },
-                            label = { Text("Litros") },
-                            modifier = Modifier.fillMaxWidth(),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                Text("Foto del Recibo", style = MaterialTheme.typography.labelLarge)
+                if (photoUri != null) {
+                    Box {
+                        AsyncImage(
+                            model = photoUri,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(150.dp)
+                                .clip(MaterialTheme.shapes.medium)
+                                .clickable { showFullScreenImage = true },
+                            contentScale = ContentScale.Crop
                         )
-                    }
-                }
-
-                item {
-                    OutlinedTextField(
-                        value = nota,
-                        onValueChange = { nota = it },
-                        label = { Text(if (categoria == "Refacciones") "Descripción de la refacción" else "Nota") },
-                        modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
-                    )
-                }
-
-                item {
-                    Text("Foto del Recibo", style = MaterialTheme.typography.labelLarge)
-                    if (photoUri != null) {
-                        Box {
-                            AsyncImage(
-                                model = photoUri,
-                                contentDescription = null,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(150.dp)
-                                    .clickable { showFullScreenImage = true },
-                                contentScale = ContentScale.Crop
-                            )
-                            Row(
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(4.dp)
+                        Row(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(4.dp)
+                        ) {
+                            IconButton(
+                                onClick = { photoPickerLauncher.launch(arrayOf("image/*")) },
+                                modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), shape = MaterialTheme.shapes.small)
                             ) {
-                                IconButton(
-                                    onClick = { photoPickerLauncher.launch(arrayOf("image/*")) },
-                                    modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), shape = MaterialTheme.shapes.small)
-                                ) {
-                                    Icon(Icons.Default.Edit, contentDescription = "Cambiar foto", tint = Color.White)
-                                }
-                                Spacer(Modifier.width(4.dp))
-                                IconButton(
-                                    onClick = { photoUri = null },
-                                    modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), shape = MaterialTheme.shapes.small)
-                                ) {
-                                    Icon(Icons.Default.Close, contentDescription = "Quitar foto", tint = Color.Red)
-                                }
+                                Icon(Icons.Default.Edit, contentDescription = "Cambiar foto", tint = Color.White)
+                            }
+                            Spacer(Modifier.width(4.dp))
+                            IconButton(
+                                onClick = { photoUri = null },
+                                modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), shape = MaterialTheme.shapes.small)
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = "Quitar foto", tint = Color.Red)
                             }
                         }
-                    } else {
-                        OutlinedButton(onClick = { photoPickerLauncher.launch(arrayOf("image/*")) }, modifier = Modifier.fillMaxWidth()) {
-                            Icon(Icons.Default.Add, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Añadir Foto")
-                        }
+                    }
+                } else {
+                    OutlinedButton(onClick = { photoPickerLauncher.launch(arrayOf("image/*")) }, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.Add, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Añadir Foto")
                     }
                 }
             }

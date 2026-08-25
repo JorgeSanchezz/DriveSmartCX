@@ -53,11 +53,25 @@ object NotificationHelper {
 
         if (hasSmsPermission) {
             try {
-                val smsManager: SmsManager? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                var smsManager: SmsManager? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     context.applicationContext.getSystemService(SmsManager::class.java)
                 } else {
                     @Suppress("DEPRECATION")
                     SmsManager.getDefault()
+                }
+
+                // Forzar uso de la SIM predeterminada configurada por el usuario (Dual SIM)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && smsManager != null) {
+                    val subId = SmsManager.getDefaultSmsSubscriptionId()
+                    if (subId != -1) {
+                        smsManager = smsManager.createForSubscriptionId(subId)
+                    }
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    val subId = SmsManager.getDefaultSmsSubscriptionId()
+                    if (subId != -1) {
+                        @Suppress("DEPRECATION")
+                        smsManager = SmsManager.getSmsManagerForSubscriptionId(subId)
+                    }
                 }
 
                 if (smsManager != null) {

@@ -9,7 +9,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -19,6 +22,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -81,7 +85,7 @@ fun ServiciosScreen(viewModel: DriveSmartViewModel) {
                                 AsyncImage(
                                     model = servicio.photoUri,
                                     contentDescription = null,
-                                    modifier = Modifier.size(60.dp).padding(4.dp).align(Alignment.Top),
+                                    modifier = Modifier.size(60.dp).padding(4.dp).align(Alignment.Top).clip(MaterialTheme.shapes.small),
                                     contentScale = ContentScale.Crop
                                 )
                             }
@@ -240,154 +244,138 @@ fun AddServicioDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (servicio == null) "Nuevo Registro" else "Editar Registro") },
         text = {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                item {
-                    Text("Tipo de Registro", style = MaterialTheme.typography.labelLarge)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf("Componente", "Servicio").forEach { option ->
-                            FilterChip(
-                                selected = tipo == option,
-                                onClick = { tipo = option },
-                                label = { Text(option) }
-                            )
-                        }
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text("Tipo de Registro", style = MaterialTheme.typography.labelLarge)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("Componente", "Servicio").forEach { option ->
+                        FilterChip(
+                            selected = tipo == option,
+                            onClick = { tipo = option },
+                            label = { Text(option) }
+                        )
                     }
                 }
 
-                item {
-                    OutlinedTextField(
-                        value = nombre,
-                        onValueChange = { nombre = it },
-                        label = { Text(if (tipo == "Componente") "Nombre del Componente" else "Nombre del Servicio") },
-                        modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words)
-                    )
-                }
+                OutlinedTextField(
+                    value = nombre,
+                    onValueChange = { nombre = it },
+                    label = { Text(if (tipo == "Componente") "Nombre del Componente" else "Nombre del Servicio") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words)
+                )
 
-                item {
-                    OutlinedTextField(
-                        value = monto,
-                        onValueChange = { monto = it },
-                        label = { Text(if (tipo == "Componente") "Costo del Componente ($)" else "Costo del Servicio ($)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
-                    )
-                }
+                OutlinedTextField(
+                    value = monto,
+                    onValueChange = { monto = it },
+                    label = { Text(if (tipo == "Componente") "Costo del Componente ($)" else "Costo del Servicio ($)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                )
 
                 if (tipo == "Servicio") {
-                    item {
-                        OutlinedTextField(
-                            value = ultimoKm,
-                            onValueChange = { ultimoKm = it },
-                            label = { Text("KM del último servicio") },
-                            modifier = Modifier.fillMaxWidth(),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                        )
-                    }
-                    item {
-                        OutlinedTextField(
-                            value = componentes,
-                            onValueChange = { componentes = it },
-                            label = { Text("Componentes (aceite, filtros, etc.)") },
-                            modifier = Modifier.fillMaxWidth(),
-                            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
-                        )
-                    }
-
-                    item {
-                        OutlinedTextField(
-                            value = sdf.format(Date(ultimaFecha)),
-                            onValueChange = { },
-                            label = { Text("Fecha del último servicio") },
-                            modifier = Modifier.fillMaxWidth(),
-                            readOnly = true,
-                            trailingIcon = {
-                                IconButton(onClick = { showUltimaDatePicker = true }) {
-                                    Icon(Icons.Default.Edit, contentDescription = "Cambiar Fecha")
-                                }
-                            }
-                        )
-                    }
-
-                    item {
-                        OutlinedTextField(
-                            value = proximoKm,
-                            onValueChange = { proximoKm = it },
-                            label = { Text("Próximo cambio (KM)") },
-                            placeholder = { Text("Opcional") },
-                            modifier = Modifier.fillMaxWidth(),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                        )
-                    }
-                }
-
-                item {
                     OutlinedTextField(
-                        value = sdf.format(Date(proximaFecha)),
+                        value = ultimoKm,
+                        onValueChange = { ultimoKm = it },
+                        label = { Text("KM del último servicio") },
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+                    OutlinedTextField(
+                        value = componentes,
+                        onValueChange = { componentes = it },
+                        label = { Text("Componentes (aceite, filtros, etc.)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
+                    )
+
+                    OutlinedTextField(
+                        value = sdf.format(Date(ultimaFecha)),
                         onValueChange = { },
-                        label = { Text(if (tipo == "Componente") "Próxima fecha de instalación (Opcional)" else "Próxima fecha de servicio (Opcional)") },
+                        label = { Text("Fecha del último servicio") },
                         modifier = Modifier.fillMaxWidth(),
                         readOnly = true,
                         trailingIcon = {
-                            IconButton(onClick = { showProximaDatePicker = true }) {
-                                Icon(Icons.Default.Edit, contentDescription = "Editar Fecha")
+                            IconButton(onClick = { showUltimaDatePicker = true }) {
+                                Icon(Icons.Default.Edit, contentDescription = "Cambiar Fecha")
                             }
                         }
                     )
+
+                    OutlinedTextField(
+                        value = proximoKm,
+                        onValueChange = { proximoKm = it },
+                        label = { Text("Próximo cambio (KM)") },
+                        placeholder = { Text("Opcional") },
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
                 }
 
-                item {
-                    Text("Estatus", style = MaterialTheme.typography.labelLarge)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf("Pendiente", "Realizado", "Crítico").forEach { option ->
-                            FilterChip(
-                                selected = estatus == option,
-                                onClick = { estatus = option },
-                                label = { Text(option) }
-                            )
+                OutlinedTextField(
+                    value = sdf.format(Date(proximaFecha)),
+                    onValueChange = { },
+                    label = { Text(if (tipo == "Componente") "Próxima fecha de instalación (Opcional)" else "Próxima fecha de servicio (Opcional)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    readOnly = true,
+                    trailingIcon = {
+                        IconButton(onClick = { showProximaDatePicker = true }) {
+                            Icon(Icons.Default.Edit, contentDescription = "Editar Fecha")
                         }
+                    }
+                )
+
+                Text("Estatus", style = MaterialTheme.typography.labelLarge)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("Pendiente", "Realizado", "Crítico").forEach { option ->
+                        FilterChip(
+                            selected = estatus == option,
+                            onClick = { estatus = option },
+                            label = { Text(option) }
+                        )
                     }
                 }
 
-                item {
-                    Text("Evidencia / Foto", style = MaterialTheme.typography.labelLarge)
-                    if (photoUri != null) {
-                        Box {
-                            AsyncImage(
-                                model = photoUri,
-                                contentDescription = null,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(150.dp)
-                                    .clickable { showFullScreenImage = true },
-                                contentScale = ContentScale.Crop
-                            )
-                            Row(
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(4.dp)
+                Text("Evidencia / Foto", style = MaterialTheme.typography.labelLarge)
+                if (photoUri != null) {
+                    Box {
+                        AsyncImage(
+                            model = photoUri,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(150.dp)
+                                .clip(MaterialTheme.shapes.medium)
+                                .clickable { showFullScreenImage = true },
+                            contentScale = ContentScale.Crop
+                        )
+                        Row(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(4.dp)
+                        ) {
+                            IconButton(
+                                onClick = { photoPickerLauncher.launch(arrayOf("image/*")) },
+                                modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), shape = CircleShape)
                             ) {
-                                IconButton(
-                                    onClick = { photoPickerLauncher.launch(arrayOf("image/*")) },
-                                    modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), shape = MaterialTheme.shapes.small)
-                                ) {
-                                    Icon(Icons.Default.Edit, contentDescription = "Cambiar foto", tint = Color.White)
-                                }
-                                Spacer(Modifier.width(4.dp))
-                                IconButton(
-                                    onClick = { photoUri = null },
-                                    modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), shape = MaterialTheme.shapes.small)
-                                ) {
-                                    Icon(Icons.Default.Close, contentDescription = "Quitar foto", tint = Color.Red)
-                                }
+                                Icon(Icons.Default.Edit, contentDescription = "Cambiar foto", tint = Color.White)
+                            }
+                            Spacer(Modifier.width(4.dp))
+                            IconButton(
+                                onClick = { photoUri = null },
+                                modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), shape = CircleShape)
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = "Quitar foto", tint = Color.Red)
                             }
                         }
-                    } else {
-                        OutlinedButton(onClick = { photoPickerLauncher.launch(arrayOf("image/*")) }, modifier = Modifier.fillMaxWidth()) {
-                            Icon(Icons.Default.Add, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Añadir Foto")
-                        }
+                    }
+                } else {
+                    OutlinedButton(onClick = { photoPickerLauncher.launch(arrayOf("image/*")) }, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.Add, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Añadir Foto")
                     }
                 }
             }

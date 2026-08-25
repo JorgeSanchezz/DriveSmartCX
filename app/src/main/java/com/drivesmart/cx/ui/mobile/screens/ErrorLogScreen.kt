@@ -124,7 +124,7 @@ fun ErrorLogScreen(
                         ) {
                             Text(
                                 text = selectedLog!!.stackTrace!!,
-                                modifier = Modifier.padding(8.dp).verticalScroll(rememberScrollState()),
+                                modifier = Modifier.padding(8.dp),
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 10.sp,
                                 color = Color(0xFFCCCCCC)

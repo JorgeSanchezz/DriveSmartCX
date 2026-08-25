@@ -37,4 +37,13 @@ object LocationHelper {
             null
         }
     }
+
+    /**
+     * Calcula la distancia en metros entre dos puntos geográficos.
+     */
+    fun calculateDistance(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Float {
+        val results = FloatArray(1)
+        Location.distanceBetween(lat1, lng1, lat2, lng2, results)
+        return results[0]
+    }
 }

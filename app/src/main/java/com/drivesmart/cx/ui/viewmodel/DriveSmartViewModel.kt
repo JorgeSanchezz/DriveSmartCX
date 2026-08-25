@@ -170,15 +170,21 @@ class DriveSmartViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val data = driveSmartRepository.getAllData()
-                val json = BackupHelper.exportToJson(data)
-                context.contentResolver.openOutputStream(uri)?.use { 
-                    it.write(json.toByteArray())
+                val isZip = uri.toString().contains(".zip", ignoreCase = true)
+
+                if (isZip) {
+                    BackupHelper.exportZipBackup(context, uri, data)
+                } else {
+                    val json = BackupHelper.exportToJson(data)
+                    context.contentResolver.openOutputStream(uri)?.use { 
+                        it.write(json.toByteArray())
+                    }
                 }
                 withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    android.widget.Toast.makeText(context, "Copia de seguridad guardada", android.widget.Toast.LENGTH_SHORT).show()
+                    android.widget.Toast.makeText(context, "Respaldo guardado con éxito", android.widget.Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {
-                logger.e("DriveSmartVM", "Error al exportar JSON", e)
+                logger.e("DriveSmartVM", "Error al exportar respaldo", e)
                 withContext(kotlinx.coroutines.Dispatchers.Main) {
                     android.widget.Toast.makeText(context, "Error al exportar: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
                 }
@@ -189,35 +195,46 @@ class DriveSmartViewModel @Inject constructor(
     fun importBackup(context: Context, uri: Uri) {
         viewModelScope.launch {
             try {
-                val json = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
-                if (json != null) {
-                    val data = BackupHelper.importFromJson(json)
-                    // Verificación extra de nulidad para campos internos por si falla ProGuard
-                    if (data != null && data.vehicles != null && data.vehicles.isNotEmpty()) {
-                        driveSmartRepository.restoreAllData(data)
-                        
-                        // Resetear el ID del vehículo seleccionado tras la importación
-                        val newSelectedId = data.vehicles.find { it.isSelected }?.id ?: data.vehicles.first().id
-                        selectVehicle(newSelectedId)
-                        
-                        withContext(kotlinx.coroutines.Dispatchers.Main) {
-                            android.widget.Toast.makeText(context, "Respaldo importado con éxito", android.widget.Toast.LENGTH_LONG).show()
-                        }
-                    } else if (data != null && (data.vehicles == null || data.vehicles.isEmpty())) {
-                        val errorMsg = "El respaldo no contiene vehículos válidos o el archivo está corrupto"
-                        logger.e("DriveSmartVM", errorMsg)
-                        withContext(kotlinx.coroutines.Dispatchers.Main) {
-                            android.widget.Toast.makeText(context, errorMsg, android.widget.Toast.LENGTH_LONG).show()
-                        }
+                // Detectar si es ZIP revisando los primeros bytes (Firma PK)
+                val isZipFile = context.contentResolver.openInputStream(uri)?.use { input ->
+                    val header = ByteArray(2)
+                    input.read(header) == 2 && header[0] == 0x50.toByte() && header[1] == 0x4B.toByte()
+                } ?: false
+
+                val data = if (isZipFile) {
+                    BackupHelper.importZipBackup(context, uri)
+                } else {
+                    val json = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                    if (json != null && json.trim().startsWith("{")) {
+                        BackupHelper.importFromJson(json)
                     } else {
-                        val errorMsg = "El archivo no tiene un formato de respaldo válido"
-                        logger.e("DriveSmartVM", errorMsg)
-                        withContext(kotlinx.coroutines.Dispatchers.Main) {
-                            android.widget.Toast.makeText(context, errorMsg, android.widget.Toast.LENGTH_LONG).show()
-                        }
+                        null
+                    }
+                }
+
+                // Verificación de nulidad para campos internos
+                if (data != null && data.vehicles != null && data.vehicles.isNotEmpty()) {
+                    driveSmartRepository.restoreAllData(data)
+                    
+                    // Resetear el ID del vehículo seleccionado tras la importación
+                    val newSelectedId = data.vehicles.find { it.isSelected }?.id ?: data.vehicles.first().id
+                    selectVehicle(newSelectedId)
+                    
+                    withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        android.widget.Toast.makeText(context, "Respaldo importado con éxito", android.widget.Toast.LENGTH_LONG).show()
+                    }
+                } else if (data != null && (data.vehicles == null || data.vehicles.isEmpty())) {
+                    val errorMsg = "El respaldo no contiene vehículos válidos o el archivo está corrupto"
+                    logger.e("DriveSmartVM", errorMsg)
+                    withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        android.widget.Toast.makeText(context, errorMsg, android.widget.Toast.LENGTH_LONG).show()
                     }
                 } else {
-                    logger.e("DriveSmartVM", "No se pudo leer el contenido del archivo")
+                    val errorMsg = "El archivo no tiene un formato de respaldo válido"
+                    logger.e("DriveSmartVM", errorMsg)
+                    withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        android.widget.Toast.makeText(context, errorMsg, android.widget.Toast.LENGTH_LONG).show()
+                    }
                 }
             } catch (e: Exception) {
                 logger.e("DriveSmartVM", "Fallo crítico al importar el archivo", e)
@@ -440,13 +457,26 @@ class DriveSmartViewModel @Inject constructor(
     fun endViaje(lat: Double, lng: Double) {
         val viaje = activeViaje.value ?: return
         viewModelScope.launch {
+            val distanceMeters = com.drivesmart.cx.util.LocationHelper.calculateDistance(
+                viaje.latInicio, viaje.lngInicio, lat, lng
+            )
+            val distanceKm = distanceMeters / 1000.0
+
             val updated = viaje.copy(
                 fechaFin = System.currentTimeMillis(),
                 latFin = lat,
                 lngFin = lng,
+                distancia = distanceKm,
                 duracion = System.currentTimeMillis() - viaje.fechaInicio
             )
             driveSmartRepository.updateViaje(updated)
+
+            // Actualizar odómetro del vehículo
+            allVehicles.value?.find { it.id == viaje.vehiculoId }?.let { vehicle ->
+                vehicleRepository.saveVehicle(
+                    vehicle.copy(kilometrajeActual = vehicle.kilometrajeActual + distanceKm)
+                )
+            }
         }
     }
 

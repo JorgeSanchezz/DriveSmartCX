@@ -50,7 +50,7 @@ fun ConfiguracionScreen(viewModel: DriveSmartViewModel) {
     )
 
     val exportJsonLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/json")
+        contract = ActivityResultContracts.CreateDocument("application/zip")
     ) { uri ->
         uri?.let { viewModel.exportBackup(context, it) }
     }
@@ -187,15 +187,15 @@ fun ConfiguracionScreen(viewModel: DriveSmartViewModel) {
                         HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), thickness = 0.5.dp)
                         SettingsActionItem(
                             title = "Crear Copia de Seguridad",
-                            description = "Exportar todos los datos (JSON)",
+                            description = "Exportar datos y evidencias (ZIP)",
                             icon = Icons.AutoMirrored.Filled.ArrowForward,
-                            onClick = { exportJsonLauncher.launch("DriveSmartCX_Backup.json") }
+                            onClick = { exportJsonLauncher.launch("DriveSmartCX_Backup.zip") }
                         )
                         SettingsActionItem(
                             title = "Restaurar Copia de Seguridad",
-                            description = "Importar datos desde archivo JSON",
+                            description = "Importar archivo ZIP o JSON legado",
                             icon = Icons.AutoMirrored.Filled.ArrowBack,
-                            onClick = { importJsonLauncher.launch(arrayOf("application/json", "application/octet-stream")) }
+                            onClick = { importJsonLauncher.launch(arrayOf("application/zip", "application/json", "application/octet-stream")) }
                         )
                     }
                 }
@@ -223,7 +223,7 @@ fun ConfiguracionScreen(viewModel: DriveSmartViewModel) {
             item {
                 Spacer(modifier = Modifier.height(24.dp))
                 Text(
-                    text = "DriveSmartCX v1.6",
+                    text = "DriveSmartCX v1.8",
                     modifier = Modifier.fillMaxWidth(),
                     textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.labelSmall,

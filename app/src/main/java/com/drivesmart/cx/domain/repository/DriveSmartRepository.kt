@@ -2,8 +2,8 @@ package com.drivesmart.cx.domain.repository
 
 import com.drivesmart.cx.data.local.entity.*
 import kotlinx.coroutines.flow.Flow
-
 import androidx.annotation.Keep
+import com.google.gson.annotations.SerializedName
 
 interface DriveSmartRepository {
     // Error Logs
@@ -63,14 +63,14 @@ interface DriveSmartRepository {
 
 @Keep
 data class BackupData(
-    val vehicles: List<VehiculoEntity> = emptyList(),
-    val gastos: List<GastoEntity> = emptyList(),
-    val servicios: List<ServicioEntity> = emptyList(),
-    val tramites: List<TramiteEntity> = emptyList(),
-    val bitacora: List<BitacoraEntity> = emptyList(),
-    val contactos: List<ContactoEntity> = emptyList(),
-    val ubicaciones: List<UbicacionEntity> = emptyList(),
-    val seguros: List<SeguroEntity> = emptyList(),
-    val preventivos: List<PreventivoEntity> = emptyList(),
-    val sosContacts: List<ContactoEmergenciaEntity> = emptyList()
+    @SerializedName("vehicles") val vehicles: List<VehiculoEntity> = emptyList(),
+    @SerializedName("gastos") val gastos: List<GastoEntity> = emptyList(),
+    @SerializedName("servicios") val servicios: List<ServicioEntity> = emptyList(),
+    @SerializedName("tramites") val tramites: List<TramiteEntity> = emptyList(),
+    @SerializedName("bitacora") val bitacora: List<BitacoraEntity> = emptyList(),
+    @SerializedName("contactos") val contactos: List<ContactoEntity> = emptyList(),
+    @SerializedName("ubicaciones") val ubicaciones: List<UbicacionEntity> = emptyList(),
+    @SerializedName("seguros") val seguros: List<SeguroEntity> = emptyList(),
+    @SerializedName("preventivos") val preventivos: List<PreventivoEntity> = emptyList(),
+    @SerializedName("sosContacts") val sosContacts: List<ContactoEmergenciaEntity> = emptyList()
 )

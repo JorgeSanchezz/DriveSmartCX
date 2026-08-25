@@ -23,7 +23,7 @@ object DataModule {
             context,
             AppDatabase::class.java,
             "assistant_db"
-        ).fallbackToDestructiveMigration().build()
+        ).build()
     }
 
     @Provides

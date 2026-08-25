@@ -82,6 +82,27 @@ class EmergenciasCarScreen(
         }
 
         val gridBuilder = ItemList.Builder()
+
+        // 1. Botón de Marcación Rápida SOS (Prioritario)
+        if (sosContacts.isNotEmpty()) {
+            val mainSos = sosContacts.first()
+            gridBuilder.addItem(
+                GridItem.Builder()
+                    .setTitle("LLAMADA SOS: ${mainSos.nombre}")
+                    .setText("Marcar número de emergencia inmediatamente")
+                    .setImage(CarIcon.Builder(IconCompat.createWithResource(carContext, R.drawable.ic_car_call))
+                        .setTint(CarColor.RED)
+                        .build())
+                    .setOnClickListener {
+                        val intent = Intent(Intent.ACTION_DIAL).apply {
+                            data = Uri.parse("tel:${mainSos.telefono}")
+                        }
+                        carContext.startCarApp(intent)
+                    }
+                    .build()
+            )
+        }
+
         val templateBuilder = GridTemplate.Builder()
 
         // 1. Configurar ActionStrip solo si hay contactos SOS

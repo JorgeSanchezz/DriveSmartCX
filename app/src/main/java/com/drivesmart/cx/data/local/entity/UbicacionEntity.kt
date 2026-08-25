@@ -5,6 +5,7 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.google.gson.annotations.SerializedName
 
 @Keep
 @Entity(
@@ -20,10 +21,10 @@ import androidx.room.PrimaryKey
     indices = [Index("vehiculoId")]
 )
 data class UbicacionEntity(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val vehiculoId: Long,
-    val nombre: String,
-    val latitud: Double,
-    val longitud: Double,
-    val fechaGuardado: Long
+    @PrimaryKey(autoGenerate = true) @SerializedName("id") val id: Long = 0,
+    @SerializedName("vehiculoId") val vehiculoId: Long,
+    @SerializedName("nombre") val nombre: String,
+    @SerializedName("latitud") val latitud: Double,
+    @SerializedName("longitud") val longitud: Double,
+    @SerializedName("fechaGuardado") val fechaGuardado: Long
 )

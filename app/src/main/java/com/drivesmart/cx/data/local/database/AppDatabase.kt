@@ -21,7 +21,7 @@ import com.drivesmart.cx.data.local.entity.*
         ErrorLogEntity::class
     ],
     version = 11,
-    exportSchema = false
+    exportSchema = true
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
