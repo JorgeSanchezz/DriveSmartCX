@@ -13,6 +13,7 @@ import com.drivesmart.cx.data.local.entity.*
         ServicioEntity::class,
         TramiteEntity::class,
         BitacoraEntity::class,
+        BitacoraPuntoEntity::class,
         ContactoEntity::class,
         UbicacionEntity::class,
         SeguroEntity::class,
@@ -20,7 +21,7 @@ import com.drivesmart.cx.data.local.entity.*
         ContactoEmergenciaEntity::class,
         ErrorLogEntity::class
     ],
-    version = 11,
+    version = 12,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -30,6 +31,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun servicioDao(): ServicioDao
     abstract fun tramiteDao(): TramiteDao
     abstract fun bitacoraDao(): BitacoraDao
+    abstract fun bitacoraPuntoDao(): BitacoraPuntoDao
     abstract fun contactoDao(): ContactoDao
     abstract fun ubicacionDao(): UbicacionDao
     abstract fun seguroDao(): SeguroDao

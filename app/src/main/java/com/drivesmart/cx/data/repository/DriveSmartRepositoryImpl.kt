@@ -20,6 +20,7 @@ class DriveSmartRepositoryImpl @Inject constructor(
     private val servicioDao: ServicioDao,
     private val tramiteDao: TramiteDao,
     private val bitacoraDao: BitacoraDao,
+    private val bitacoraPuntoDao: BitacoraPuntoDao,
     private val contactoDao: ContactoDao,
     private val ubicacionDao: UbicacionDao,
     private val seguroDao: SeguroDao,
@@ -51,6 +52,12 @@ class DriveSmartRepositoryImpl @Inject constructor(
     override suspend fun updateViaje(viaje: BitacoraEntity) = bitacoraDao.updateViaje(viaje)
     override suspend fun removeViaje(viaje: BitacoraEntity) = bitacoraDao.deleteViaje(viaje)
 
+    override fun getPuntosByViaje(viajeId: Long) = bitacoraPuntoDao.getPuntosByViaje(viajeId)
+    override suspend fun getPuntosByViajeSync(viajeId: Long) = bitacoraPuntoDao.getPuntosByViajeSync(viajeId)
+    override suspend fun insertPunto(punto: BitacoraPuntoEntity) = bitacoraPuntoDao.insertPunto(punto)
+    override suspend fun insertPuntos(puntos: List<BitacoraPuntoEntity>) = bitacoraPuntoDao.insertPuntos(puntos)
+    override suspend fun deletePuntosByViaje(viajeId: Long) = bitacoraPuntoDao.deletePuntosByViaje(viajeId)
+
     override fun getContactos(vehiculoId: Long) = contactoDao.getContactosByVehiculo(vehiculoId)
     override suspend fun saveContacto(contacto: ContactoEntity) = contactoDao.insertContacto(contacto)
     override suspend fun removeContacto(contacto: ContactoEntity) = contactoDao.deleteContacto(contacto)
@@ -77,6 +84,7 @@ class DriveSmartRepositoryImpl @Inject constructor(
             servicios = servicioDao.getAllServicios(),
             tramites = tramiteDao.getAllTramites(),
             bitacora = bitacoraDao.getAllBitacora(),
+            bitacoraPuntos = bitacoraPuntoDao.getAllPuntos(),
             contactos = contactoDao.getAllContactos(),
             ubicaciones = ubicacionDao.getAllUbicaciones(),
             seguros = seguroDao.getAllSeguros(),
@@ -97,6 +105,7 @@ class DriveSmartRepositoryImpl @Inject constructor(
                     servicioDao.clearServicios()
                     tramiteDao.clearTramites()
                     bitacoraDao.clearBitacora()
+                    bitacoraPuntoDao.clearBitacoraPuntos()
                     contactoDao.clearContactos()
                     ubicacionDao.clearUbicaciones()
                     seguroDao.clearSeguros()
@@ -118,6 +127,11 @@ class DriveSmartRepositoryImpl @Inject constructor(
 
                     bitacoraDao.insertBitacora(data.bitacora)
                     Log.d("DriveSmartRepo", "Bitácora restaurada: ${data.bitacora.size}")
+
+                    if (data.bitacoraPuntos.isNotEmpty()) {
+                        bitacoraPuntoDao.insertPuntos(data.bitacoraPuntos)
+                        Log.d("DriveSmartRepo", "Puntos de bitácora restaurados: ${data.bitacoraPuntos.size}")
+                    }
 
                     contactoDao.insertContactos(data.contactos)
                     Log.d("DriveSmartRepo", "Contactos restaurados: ${data.contactos.size}")

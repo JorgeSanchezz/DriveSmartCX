@@ -14,9 +14,10 @@ android {
     defaultConfig {
         applicationId = "com.drivesmart.cx"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 9
-        versionName = "1.8"
+        targetSdk = 36
+        versionCode = 13
+        versionName = "1.12"
+        manifestPlaceholders["MAPS_API_KEY"] = (project.findProperty("MAPS_API_KEY") as? String) ?: "DEFAULT_KEY"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -100,6 +101,11 @@ dependencies {
     // Data Export / Backup
     implementation(libs.gson)
     implementation(libs.opencsv)
+
+    // Maps & Location
+    implementation(libs.play.services.location)
+    implementation(libs.play.services.maps)
+    implementation(libs.maps.compose)
 
     // Testing
     testImplementation(libs.junit)

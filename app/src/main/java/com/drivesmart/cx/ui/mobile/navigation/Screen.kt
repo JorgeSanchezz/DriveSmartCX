@@ -19,4 +19,7 @@ sealed class Screen(val route: String) {
     object Preventivos : Screen("preventivos")
     object SOSConfig : Screen("sos_config")
     object ErrorLogs : Screen("error_logs")
+    object RutaViaje : Screen("ruta_viaje/{viajeId}") {
+        fun createRoute(viajeId: Long) = "ruta_viaje/$viajeId"
+    }
 }

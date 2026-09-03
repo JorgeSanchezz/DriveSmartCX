@@ -1,11 +1,5 @@
 package com.drivesmart.cx.ui.mobile.screens
 
-import android.annotation.SuppressLint
-import android.content.Context
-import android.content.Intent
-import android.location.Location
-import android.location.LocationManager
-import android.net.Uri
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -28,14 +22,14 @@ import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BitacoraScreen(viewModel: DriveSmartViewModel) {
+fun BitacoraScreen(
+    viewModel: DriveSmartViewModel,
+    onNavigateToRuta: (Long) -> Unit
+) {
     val bitacora by viewModel.currentBitacora.collectAsState()
     val activeViaje by viewModel.activeViaje.collectAsState()
     val context = LocalContext.current
     
-    val sdfFull = remember { 
-        SimpleDateFormat("dd/MM/yyyy hh:mm a", Locale.getDefault())
-    }
     val sdfTime = remember { 
         SimpleDateFormat("hh:mm a", Locale.getDefault())
     }
@@ -78,9 +72,9 @@ fun BitacoraScreen(viewModel: DriveSmartViewModel) {
                                 android.widget.Toast.makeText(context, "Sin señal GPS: Se usará ubicación 0,0", android.widget.Toast.LENGTH_SHORT).show()
                             }
                             if (activeViaje == null) {
-                                viewModel.startViaje(loc?.latitude ?: 0.0, loc?.longitude ?: 0.0)
+                                viewModel.startViaje(context, loc?.latitude ?: 0.0, loc?.longitude ?: 0.0)
                             } else {
-                                viewModel.endViaje(loc?.latitude ?: 0.0, loc?.longitude ?: 0.0)
+                                viewModel.endViaje(context, loc?.latitude ?: 0.0, loc?.longitude ?: 0.0)
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
@@ -102,11 +96,13 @@ fun BitacoraScreen(viewModel: DriveSmartViewModel) {
             ) {
                 val filteredBitacora = bitacora.filter { it.fechaFin != null }
                 items(filteredBitacora) { viaje ->
-                    ViajeItem(viaje, sdfDate, sdfTime, onDelete = { viewModel.removeViaje(viaje) }, onShowMap = {
-                        val uri = "http://maps.google.com/maps?saddr=${viaje.latInicio},${viaje.lngInicio}&daddr=${viaje.latFin},${viaje.lngFin}"
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(uri))
-                        context.startActivity(intent)
-                    })
+                    ViajeItem(
+                        viaje = viaje,
+                        sdfDate = sdfDate,
+                        sdfTime = sdfTime,
+                        onDelete = { viewModel.removeViaje(viaje) },
+                        onShowMap = { onNavigateToRuta(viaje.id) }
+                    )
                 }
             }
         }
@@ -114,7 +110,13 @@ fun BitacoraScreen(viewModel: DriveSmartViewModel) {
 }
 
 @Composable
-fun ViajeItem(viaje: BitacoraEntity, sdfDate: SimpleDateFormat, sdfTime: SimpleDateFormat, onDelete: () -> Unit, onShowMap: () -> Unit) {
+fun ViajeItem(
+    viaje: BitacoraEntity,
+    sdfDate: SimpleDateFormat,
+    sdfTime: SimpleDateFormat,
+    onDelete: () -> Unit,
+    onShowMap: () -> Unit
+) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f).padding(8.dp)) {
@@ -126,13 +128,22 @@ fun ViajeItem(viaje: BitacoraEntity, sdfDate: SimpleDateFormat, sdfTime: SimpleD
                     text = "${sdfTime.format(Date(viaje.fechaInicio))} - ${sdfTime.format(Date(viaje.fechaFin ?: 0))}",
                     style = MaterialTheme.typography.bodyMedium
                 )
-                if (viaje.duracion != null) {
-                    val mins = viaje.duracion / 60000
-                    Text("Duración: $mins min", style = MaterialTheme.typography.bodySmall)
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (viaje.distancia != null) {
+                        Text(
+                            text = String.format(Locale.getDefault(), "Distancia: %.2f km", viaje.distancia),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    if (viaje.duracion != null) {
+                        val mins = viaje.duracion / 60000
+                        Text("Duración: $mins min", style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             }
             IconButton(onClick = onShowMap) {
-                Icon(Icons.Default.LocationOn, contentDescription = "Ver ruta", tint = MaterialTheme.colorScheme.primary)
+                Icon(Icons.Default.LocationOn, contentDescription = "Ver ruta trazada", tint = MaterialTheme.colorScheme.primary)
             }
             IconButton(onClick = onDelete) {
                 Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = MaterialTheme.colorScheme.error)

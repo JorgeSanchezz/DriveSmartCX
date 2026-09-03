@@ -3,6 +3,8 @@ package com.drivesmart.cx.di
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.room.Room
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.drivesmart.cx.data.local.dao.*
 import com.drivesmart.cx.data.local.database.AppDatabase
 import dagger.Module
@@ -16,6 +18,24 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object DataModule {
 
+    private val MIGRATION_11_12 = object : Migration(11, 12) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `bitacora_puntos` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `viajeId` INTEGER NOT NULL,
+                    `latitud` REAL NOT NULL,
+                    `longitud` REAL NOT NULL,
+                    `timestamp` INTEGER NOT NULL,
+                    FOREIGN KEY(`viajeId`) REFERENCES `bitacora`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent()
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_bitacora_puntos_viajeId` ON `bitacora_puntos` (`viajeId`)")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase {
@@ -23,7 +43,10 @@ object DataModule {
             context,
             AppDatabase::class.java,
             "assistant_db"
-        ).build()
+        )
+        .addMigrations(MIGRATION_11_12)
+        .fallbackToDestructiveMigrationOnDowngrade()
+        .build()
     }
 
     @Provides
@@ -40,6 +63,9 @@ object DataModule {
 
     @Provides
     fun provideBitacoraDao(db: AppDatabase): BitacoraDao = db.bitacoraDao()
+
+    @Provides
+    fun provideBitacoraPuntoDao(db: AppDatabase): BitacoraPuntoDao = db.bitacoraPuntoDao()
 
     @Provides
     fun provideContactoDao(db: AppDatabase): ContactoDao = db.contactoDao()

@@ -76,7 +76,23 @@ fun DriveSmartNavGraph(
             )
         }
         composable(Screen.Bitacora.route) {
-            BitacoraScreen(viewModel)
+            BitacoraScreen(
+                viewModel = viewModel,
+                onNavigateToRuta = { viajeId ->
+                    navController.navigate(Screen.RutaViaje.createRoute(viajeId))
+                }
+            )
+        }
+        composable(
+            route = Screen.RutaViaje.route,
+            arguments = listOf(navArgument("viajeId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val viajeId = backStackEntry.arguments?.getLong("viajeId") ?: -1L
+            RutaViajeScreen(
+                viajeId = viajeId,
+                viewModel = viewModel,
+                onBack = { navController.popBackStack() }
+            )
         }
         composable(Screen.Seguro.route) {
             SeguroScreen(viewModel)

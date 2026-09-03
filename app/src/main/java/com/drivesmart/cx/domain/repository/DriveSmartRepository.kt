@@ -30,9 +30,16 @@ interface DriveSmartRepository {
     // Bitácora
     fun getBitacora(vehiculoId: Long): Flow<List<BitacoraEntity>>
     suspend fun getActiveViaje(vehiculoId: Long): BitacoraEntity?
-    suspend fun startViaje(viaje: BitacoraEntity)
+    suspend fun startViaje(viaje: BitacoraEntity): Long
     suspend fun updateViaje(viaje: BitacoraEntity)
     suspend fun removeViaje(viaje: BitacoraEntity)
+
+    // Bitácora Puntos
+    fun getPuntosByViaje(viajeId: Long): Flow<List<BitacoraPuntoEntity>>
+    suspend fun getPuntosByViajeSync(viajeId: Long): List<BitacoraPuntoEntity>
+    suspend fun insertPunto(punto: BitacoraPuntoEntity): Long
+    suspend fun insertPuntos(puntos: List<BitacoraPuntoEntity>)
+    suspend fun deletePuntosByViaje(viajeId: Long)
 
     // Contactos & Ubicaciones
     fun getContactos(vehiculoId: Long): Flow<List<ContactoEntity>>
@@ -68,6 +75,7 @@ data class BackupData(
     @SerializedName("servicios") val servicios: List<ServicioEntity> = emptyList(),
     @SerializedName("tramites") val tramites: List<TramiteEntity> = emptyList(),
     @SerializedName("bitacora") val bitacora: List<BitacoraEntity> = emptyList(),
+    @SerializedName("bitacoraPuntos") val bitacoraPuntos: List<BitacoraPuntoEntity> = emptyList(),
     @SerializedName("contactos") val contactos: List<ContactoEntity> = emptyList(),
     @SerializedName("ubicaciones") val ubicaciones: List<UbicacionEntity> = emptyList(),
     @SerializedName("seguros") val seguros: List<SeguroEntity> = emptyList(),

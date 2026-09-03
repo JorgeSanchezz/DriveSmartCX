@@ -1,11 +1,14 @@
 package com.drivesmart.cx.car.screens
 
+import android.content.Intent
+import android.os.Build
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.model.*
 import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.lifecycleScope
 import com.drivesmart.cx.data.local.entity.BitacoraEntity
+import com.drivesmart.cx.data.local.entity.BitacoraPuntoEntity
 import com.drivesmart.cx.data.local.entity.VehiculoEntity
 import com.drivesmart.cx.domain.repository.DriveSmartRepository
 import com.drivesmart.cx.domain.repository.VehicleRepository
@@ -180,23 +183,48 @@ class MainScreen(
             val vehicle = currentVehicle
             if (vehicle != null) {
                 val loc = LocationHelper.getLastKnownLocation(carContext)
-                if (loc == null) {
-                    androidx.car.app.CarToast.makeText(carContext, "Error: Sin señal GPS", androidx.car.app.CarToast.LENGTH_LONG).show()
-                }
-                
-                driveSmartRepository.startViaje(
+                val lat = loc?.latitude ?: 0.0
+                val lng = loc?.longitude ?: 0.0
+
+                val viajeId = driveSmartRepository.startViaje(
                     BitacoraEntity(
                         vehiculoId = vehicle.id,
                         fechaInicio = System.currentTimeMillis(),
                         fechaFin = null,
-                        latInicio = loc?.latitude ?: 0.0,
-                        lngInicio = loc?.longitude ?: 0.0,
+                        latInicio = lat,
+                        lngInicio = lng,
                         latFin = null,
                         lngFin = null,
                         distancia = null,
                         duracion = null
                     )
                 )
+
+                if (lat != 0.0 || lng != 0.0) {
+                    driveSmartRepository.insertPunto(
+                        BitacoraPuntoEntity(
+                            viajeId = viajeId,
+                            latitud = lat,
+                            longitud = lng,
+                            timestamp = System.currentTimeMillis()
+                        )
+                    )
+                }
+
+                try {
+                    val intent = Intent(carContext, com.drivesmart.cx.service.LocationTrackingService::class.java).apply {
+                        action = com.drivesmart.cx.service.LocationTrackingService.ACTION_START
+                        putExtra(com.drivesmart.cx.service.LocationTrackingService.EXTRA_VIAJE_ID, viajeId)
+                    }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        carContext.startForegroundService(intent)
+                    } else {
+                        carContext.startService(intent)
+                    }
+                } catch (e: Exception) {
+                    com.drivesmart.cx.util.AppLogger.error("MainScreen", "Error al iniciar servicio de rastreo", e)
+                }
+
                 androidx.car.app.CarToast.makeText(carContext, "Viaje Iniciado", androidx.car.app.CarToast.LENGTH_SHORT).show()
             } else {
                 androidx.car.app.CarToast.makeText(carContext, "Selecciona un vehículo primero", androidx.car.app.CarToast.LENGTH_SHORT).show()
@@ -208,18 +236,64 @@ class MainScreen(
         val viaje = activeViaje ?: return
         lifecycleScope.launch {
             val loc = LocationHelper.getLastKnownLocation(carContext)
-            if (loc == null) {
-                androidx.car.app.CarToast.makeText(carContext, "Aviso: Viaje terminado sin GPS final", androidx.car.app.CarToast.LENGTH_LONG).show()
+            val lat = loc?.latitude ?: 0.0
+            val lng = loc?.longitude ?: 0.0
+
+            try {
+                val intent = Intent(carContext, com.drivesmart.cx.service.LocationTrackingService::class.java).apply {
+                    action = com.drivesmart.cx.service.LocationTrackingService.ACTION_STOP
+                }
+                carContext.startService(intent)
+            } catch (e: Exception) {
+                com.drivesmart.cx.util.AppLogger.error("MainScreen", "Error al detener servicio de rastreo", e)
             }
-            
+
+            val puntos = driveSmartRepository.getPuntosByViajeSync(viaje.id)
+            var lastLat = if (puntos.isNotEmpty()) puntos.last().latitud else viaje.latInicio
+            var lastLng = if (puntos.isNotEmpty()) puntos.last().longitud else viaje.lngInicio
+
+            if (lat != 0.0 && lng != 0.0) {
+                lastLat = lat
+                lastLng = lng
+            }
+
+            var totalMeters = 0.0
+            if (puntos.size >= 2) {
+                for (i in 0 until puntos.size - 1) {
+                    val p1 = puntos[i]
+                    val p2 = puntos[i + 1]
+                    totalMeters += LocationHelper.calculateDistance(p1.latitud, p1.longitud, p2.latitud, p2.longitud)
+                }
+            } else if (puntos.size == 1) {
+                val p = puntos[0]
+                totalMeters += LocationHelper.calculateDistance(viaje.latInicio, viaje.lngInicio, p.latitud, p.longitud)
+                if (lat != 0.0 && lng != 0.0) {
+                    totalMeters += LocationHelper.calculateDistance(p.latitud, p.longitud, lat, lng)
+                }
+            } else {
+                if (lat != 0.0 && lng != 0.0) {
+                    totalMeters += LocationHelper.calculateDistance(viaje.latInicio, viaje.lngInicio, lat, lng)
+                }
+            }
+
+            val distanceKm = totalMeters / 1000.0
+
             driveSmartRepository.updateViaje(
                 viaje.copy(
                     fechaFin = System.currentTimeMillis(),
-                    latFin = loc?.latitude ?: 0.0,
-                    lngFin = loc?.longitude ?: 0.0,
+                    latFin = lastLat,
+                    lngFin = lastLng,
+                    distancia = distanceKm,
                     duracion = System.currentTimeMillis() - viaje.fechaInicio
                 )
             )
+
+            currentVehicle?.let { vehicle ->
+                vehicleRepository.saveVehicle(
+                    vehicle.copy(kilometrajeActual = vehicle.kilometrajeActual + distanceKm)
+                )
+            }
+
             androidx.car.app.CarToast.makeText(carContext, "Viaje Terminado", androidx.car.app.CarToast.LENGTH_SHORT).show()
         }
     }

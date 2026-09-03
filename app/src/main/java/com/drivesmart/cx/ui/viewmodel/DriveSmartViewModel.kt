@@ -1,6 +1,7 @@
 package com.drivesmart.cx.ui.viewmodel
 
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import android.net.Uri
 import android.util.Log
@@ -297,11 +298,15 @@ class DriveSmartViewModel @Inject constructor(
         }
     }
 
-    fun selectVehicle(id: Long) {
-        sharedPreferences.edit().putLong("selected_vehicle_id", id).apply()
-        
-        // Sincronizar con la base de datos para que Android Auto lo vea
+    fun selectVehicle(id: Long, context: Context? = null) {
         viewModelScope.launch {
+            val currentActive = activeViaje.value
+            if (currentActive != null && currentActive.vehiculoId != id) {
+                endViajeInternal(currentActive, context)
+            }
+            sharedPreferences.edit().putLong("selected_vehicle_id", id).apply()
+            
+            // Sincronizar con la base de datos para que Android Auto lo vea
             allVehicles.value?.forEach { v ->
                 val shouldBeSelected = v.id == id
                 if (v.isSelected != shouldBeSelected) {
@@ -436,7 +441,7 @@ class DriveSmartViewModel @Inject constructor(
         }
     }
 
-    fun startViaje(lat: Double, lng: Double) {
+    fun startViaje(context: Context, lat: Double, lng: Double) {
         val vId = selectedVehicleId.value ?: return
         viewModelScope.launch {
             val v = BitacoraEntity(
@@ -450,33 +455,116 @@ class DriveSmartViewModel @Inject constructor(
                 distancia = null,
                 duracion = null
             )
-            driveSmartRepository.startViaje(v)
+            val viajeId = driveSmartRepository.startViaje(v)
+
+            if (lat != 0.0 || lng != 0.0) {
+                val initialPunto = BitacoraPuntoEntity(
+                    viajeId = viajeId,
+                    latitud = lat,
+                    longitud = lng,
+                    timestamp = System.currentTimeMillis()
+                )
+                driveSmartRepository.insertPunto(initialPunto)
+            }
+
+            try {
+                val intent = Intent(context, com.drivesmart.cx.service.LocationTrackingService::class.java).apply {
+                    action = com.drivesmart.cx.service.LocationTrackingService.ACTION_START
+                    putExtra(com.drivesmart.cx.service.LocationTrackingService.EXTRA_VIAJE_ID, viajeId)
+                }
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (e: Exception) {
+                logger.e("DriveSmartVM", "Error al iniciar LocationTrackingService", e)
+            }
         }
     }
 
-    fun endViaje(lat: Double, lng: Double) {
+    fun endViaje(context: Context, lat: Double = 0.0, lng: Double = 0.0) {
         val viaje = activeViaje.value ?: return
         viewModelScope.launch {
-            val distanceMeters = com.drivesmart.cx.util.LocationHelper.calculateDistance(
-                viaje.latInicio, viaje.lngInicio, lat, lng
-            )
-            val distanceKm = distanceMeters / 1000.0
+            endViajeInternal(viaje, context, lat, lng)
+        }
+    }
 
-            val updated = viaje.copy(
-                fechaFin = System.currentTimeMillis(),
-                latFin = lat,
-                lngFin = lng,
-                distancia = distanceKm,
-                duracion = System.currentTimeMillis() - viaje.fechaInicio
-            )
-            driveSmartRepository.updateViaje(updated)
+    fun getPuntosByViaje(viajeId: Long) = driveSmartRepository.getPuntosByViaje(viajeId)
 
-            // Actualizar odómetro del vehículo
-            allVehicles.value?.find { it.id == viaje.vehiculoId }?.let { vehicle ->
-                vehicleRepository.saveVehicle(
-                    vehicle.copy(kilometrajeActual = vehicle.kilometrajeActual + distanceKm)
+    private suspend fun endViajeInternal(
+        viaje: BitacoraEntity,
+        context: Context? = null,
+        finalLat: Double = 0.0,
+        finalLng: Double = 0.0
+    ) {
+        context?.let { ctx ->
+            try {
+                val intent = Intent(ctx, com.drivesmart.cx.service.LocationTrackingService::class.java).apply {
+                    action = com.drivesmart.cx.service.LocationTrackingService.ACTION_STOP
+                }
+                ctx.startService(intent)
+            } catch (e: Exception) {
+                logger.e("DriveSmartVM", "Error al detener servicio de rastreo", e)
+            }
+        }
+
+        val puntos = driveSmartRepository.getPuntosByViajeSync(viaje.id)
+
+        var lastLat = if (puntos.isNotEmpty()) puntos.last().latitud else viaje.latInicio
+        var lastLng = if (puntos.isNotEmpty()) puntos.last().longitud else viaje.lngInicio
+
+        if (finalLat != 0.0 && finalLng != 0.0) {
+            lastLat = finalLat
+            lastLng = finalLng
+        }
+
+        var totalMeters = 0.0
+        if (puntos.size >= 2) {
+            for (i in 0 until puntos.size - 1) {
+                val p1 = puntos[i]
+                val p2 = puntos[i + 1]
+                totalMeters += com.drivesmart.cx.util.LocationHelper.calculateDistance(
+                    p1.latitud, p1.longitud, p2.latitud, p2.longitud
                 )
             }
+        } else if (puntos.size == 1) {
+            val p = puntos[0]
+            totalMeters += com.drivesmart.cx.util.LocationHelper.calculateDistance(
+                viaje.latInicio, viaje.lngInicio, p.latitud, p.longitud
+            )
+            if (finalLat != 0.0 && finalLng != 0.0) {
+                totalMeters += com.drivesmart.cx.util.LocationHelper.calculateDistance(
+                    p.latitud, p.longitud, finalLat, finalLng
+                )
+            }
+        } else {
+            if (finalLat != 0.0 && finalLng != 0.0) {
+                totalMeters += com.drivesmart.cx.util.LocationHelper.calculateDistance(
+                    viaje.latInicio, viaje.lngInicio, finalLat, finalLng
+                )
+            }
+        }
+
+        val distanceKm = totalMeters / 1000.0
+
+        val updated = viaje.copy(
+            fechaFin = System.currentTimeMillis(),
+            latFin = lastLat,
+            lngFin = lastLng,
+            distancia = distanceKm,
+            duracion = System.currentTimeMillis() - viaje.fechaInicio
+        )
+        driveSmartRepository.updateViaje(updated)
+
+        val originalVehicle = vehicleRepository.getVehicleById(viaje.vehiculoId)
+            ?: allVehicles.value?.find { it.id == viaje.vehiculoId }
+
+        if (originalVehicle != null) {
+            val nuevoKm = originalVehicle.kilometrajeActual + distanceKm
+            vehicleRepository.saveVehicle(
+                originalVehicle.copy(kilometrajeActual = nuevoKm)
+            )
         }
     }
 

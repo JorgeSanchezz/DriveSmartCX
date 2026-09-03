@@ -13,7 +13,7 @@ interface BitacoraDao {
     suspend fun getActiveViaje(vehiculoId: Long): BitacoraEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertViaje(viaje: BitacoraEntity)
+    suspend fun insertViaje(viaje: BitacoraEntity): Long
 
     @Update
     suspend fun updateViaje(viaje: BitacoraEntity)
